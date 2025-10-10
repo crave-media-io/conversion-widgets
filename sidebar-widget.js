@@ -2,12 +2,14 @@
   'use strict';
   
   // ============================================
-  // SUPABASE CONFIGURATION
+  // CONFIGURATION
   // ============================================
   const SUPABASE = {
     url: 'https://dnsbirpaknvifkgbodqd.supabase.co',
     key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuc2JpcnBha252aWZrZ2JvZHFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5MDI1MjUsImV4cCI6MjA3NTQ3ODUyNX0.0f_q15ZhmHI2gEpS53DyIeRnReF-KS4YYJ1PdetyYwQ'
   };
+
+  const VERCEL_API = 'https://conversion-widget-bvlot9viq-zacs-projects-da5d5e52.vercel.app';
 
   // Get client ID from script tag
   const scriptTag = document.currentScript || document.querySelector('script[data-client-id]');
@@ -22,7 +24,8 @@
     currentIndex: 0,
     isDismissed: false,
     rotationTimer: null,
-    isVisible: false
+    isVisible: false,
+    headlines: null
   };
 
   // ============================================
@@ -55,6 +58,68 @@
       console.error('❌ Error fetching config:', error);
       return null;
     }
+  }
+
+  // ============================================
+  // FETCH/GENERATE HEADLINES
+  // ============================================
+  async function getHeadlines(config) {
+    // Check cache first
+    const cacheKey = `headlines_${CLIENT_ID}_${window.location.pathname}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    
+    if (cached) {
+      console.log('📦 Using cached headlines');
+      return JSON.parse(cached);
+    }
+
+    // If LLM generation is enabled, call Vercel API
+    if (config.generate_headlines) {
+      try {
+        console.log('🤖 Generating contextual headlines with LLM...');
+        
+        const response = await fetch(`${VERCEL_API}/api/generate-headlines`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: CLIENT_ID,
+            page_url: window.location.href,
+            page_title: document.title,
+            page_content: document.body.innerText.slice(0, 1000)
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.headlines && data.headlines.length > 0) {
+          console.log('✅ LLM headlines generated:', data.headlines);
+          
+          // Cache for this session
+          sessionStorage.setItem(cacheKey, JSON.stringify(data.headlines));
+          
+          return data.headlines;
+        } else {
+          console.warn('⚠️ LLM response invalid, falling back to static headlines');
+          return config.headlines || getDefaultHeadlines();
+        }
+      } catch (error) {
+        console.error('❌ LLM generation failed:', error);
+        console.log('📝 Falling back to static headlines');
+        return config.headlines || getDefaultHeadlines();
+      }
+    } else {
+      // Use static headlines from database
+      console.log('📝 Using static headlines from config');
+      return config.headlines || getDefaultHeadlines();
+    }
+  }
+
+  function getDefaultHeadlines() {
+    return [
+      "Need help? We're here for you!",
+      "Get started today!",
+      "Contact us now!"
+    ];
   }
 
   // ============================================
@@ -186,6 +251,7 @@
     console.log('\n📊 === SIDEBAR PERFORMANCE ANALYTICS ===');
     console.log('Client:', CLIENT_ID);
     console.log('Business:', state.config?.business_name);
+    console.log('LLM Generation:', state.config?.generate_headlines ? 'Enabled' : 'Disabled');
     console.log('\nMessage Performance:');
     
     let totalImpressions = 0;
@@ -230,7 +296,7 @@
   }
 
   // ============================================
-  // CREATE MESSAGE VARIANTS FROM CONFIG
+  // CREATE MESSAGE VARIANTS FROM HEADLINES
   // ============================================
   function createVariantsFromHeadlines(headlines) {
     const styles = ['helpful', 'urgency', 'social-proof', 'risk-reversal', 'discount'];
@@ -254,9 +320,9 @@
       ? `tel:${config.phone_number.replace(/\D/g, '')}`
       : config.booking_url;
 
-    const sidePosition = config.position === 'right'
-      ? `right: -${config.width || '380px'}; left: auto;`
-      : `left: -${config.width || '380px'}; right: auto;`;
+    const sidePosition = (config.position === 'left')
+      ? `left: -380px; right: auto;`
+      : `right: -380px; left: auto;`;
 
     const perfData = getPerformanceData()[variant.headline] || { impressions: 0, conversions: 0 };
     const rate = perfData.impressions > 0 
@@ -269,14 +335,14 @@
         top: 0;
         bottom: 0;
         ${sidePosition}
-        width: ${config.width || '380px'};
+        width: 380px;
         height: 100vh;
         background: ${config.brand_color ? `linear-gradient(180deg, ${config.brand_color} 0%, ${adjustColor(config.brand_color, -20)} 100%)` : 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)'};
         color: #ffffff;
-        box-shadow: ${config.position === 'right' ? '-4px' : '4px'} 0 30px rgba(0, 0, 0, 0.4);
+        box-shadow: ${(config.position === 'left') ? '4px' : '-4px'} 0 30px rgba(0, 0, 0, 0.4);
         z-index: 999999;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        transition: ${config.position === 'right' ? 'right' : 'left'} 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        transition: ${(config.position === 'left') ? 'left' : 'right'} 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         overflow-y: auto;
         display: flex;
         flex-direction: column;
@@ -317,7 +383,7 @@
         <button id="sidebar-dismiss" style="
           position: absolute;
           top: 20px;
-          ${config.position === 'right' ? 'left: 20px;' : 'right: 20px;'}
+          ${(config.position === 'left') ? 'right: 20px;' : 'left: 20px;'}
           background: rgba(255, 255, 255, 0.2);
           border: none;
           color: #ffffff;
@@ -463,7 +529,8 @@
     
     // Slide in
     setTimeout(() => {
-      sidebar.style[state.config.position === 'right' ? 'right' : 'left'] = '0';
+      const sideProperty = (state.config.position === 'left') ? 'left' : 'right';
+      sidebar.style[sideProperty] = '0';
     }, 100);
     
     // Add event listeners
@@ -497,8 +564,8 @@
     const sidebar = document.getElementById('vertical-sidebar');
     if (!sidebar) return;
     
-    const sideProperty = state.config.position === 'right' ? 'right' : 'left';
-    sidebar.style[sideProperty] = `-${state.config.width || '380px'}`;
+    const sideProperty = (state.config.position === 'left') ? 'left' : 'right';
+    sidebar.style[sideProperty] = '-380px';
     
     setTimeout(() => {
       sidebar.remove();
@@ -549,7 +616,7 @@
   // INITIALIZATION
   // ============================================
   async function init() {
-    console.log('📍 Supabase-Powered Sidebar initializing...');
+    console.log('📍 AI-Powered Sidebar initializing...');
     console.log('🆔 Client ID:', CLIENT_ID);
     
     // Fetch config from Supabase
@@ -566,10 +633,9 @@
       return;
     }
     
-    // Create variants from headlines
-    const variants = state.config.headlines && state.config.headlines.length > 0
-      ? createVariantsFromHeadlines(state.config.headlines)
-      : [{ headline: "Need help? We're here!", message: "Reach out today!", style: "default" }];
+    // Get headlines (LLM or static)
+    const headlines = await getHeadlines(state.config);
+    const variants = createVariantsFromHeadlines(headlines);
     
     const selectedVariant = variants[0];
     
@@ -592,6 +658,7 @@
     window.clearSidebarData = function() {
       localStorage.removeItem('sidebarPerformance_' + CLIENT_ID);
       localStorage.removeItem('sidebarDismissed_' + CLIENT_ID);
+      sessionStorage.removeItem(`headlines_${CLIENT_ID}_${window.location.pathname}`);
       console.log('✨ Sidebar data cleared!');
       location.reload();
     };
@@ -604,6 +671,15 @@
       }
     };
   }
+
+  // Make clearSidebarData always available
+  window.clearSidebarData = function() {
+    localStorage.removeItem('sidebarPerformance_' + CLIENT_ID);
+    localStorage.removeItem('sidebarDismissed_' + CLIENT_ID);
+    sessionStorage.removeItem(`headlines_${CLIENT_ID}_${window.location.pathname}`);
+    console.log('✨ Sidebar data cleared!');
+    location.reload();
+  };
 
   // ============================================
   // START
