@@ -73,43 +73,36 @@
       return JSON.parse(cached);
     }
 
-    // If LLM generation is enabled, call Vercel API
-    if (config.generate_headlines) {
-      try {
-        console.log('🤖 Generating contextual headlines with LLM...');
-        
-        const response = await fetch(`${VERCEL_API}/api/generate-headlines`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            client_id: CLIENT_ID,
-            page_url: window.location.href,
-            page_title: document.title,
-            page_content: document.body.innerText.slice(0, 1000)
-          })
-        });
-
-        const data = await response.json();
-        
-        if (data.headlines && data.headlines.length > 0) {
-          console.log('✅ LLM headlines generated:', data.headlines);
-          
-          // Cache for this session
-          sessionStorage.setItem(cacheKey, JSON.stringify(data.headlines));
-          
-          return data.headlines;
-        } else {
-          console.warn('⚠️ LLM response invalid, falling back to static headlines');
-          return config.headlines || getDefaultHeadlines();
+    // Load page-specific headlines from Supabase
+    try {
+      console.log('📋 Loading headlines for page:', window.location.pathname);
+      
+      const response = await fetch(
+        `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}&page_url=eq.${encodeURIComponent(window.location.pathname)}`,
+        {
+          headers: {
+            'apikey': SUPABASE.key,
+            'Authorization': `Bearer ${SUPABASE.key}`
+          }
         }
-      } catch (error) {
-        console.error('❌ LLM generation failed:', error);
-        console.log('📝 Falling back to static headlines');
+      );
+      
+      const data = await response.json();
+      
+      if (data && data.length > 0 && data[0].headlines) {
+        console.log('✅ Page-specific headlines loaded:', data[0].headlines);
+        
+        // Cache for this session
+        sessionStorage.setItem(cacheKey, JSON.stringify(data[0].headlines));
+        
+        return data[0].headlines;
+      } else {
+        console.log('📝 No page-specific headlines, using defaults');
         return config.headlines || getDefaultHeadlines();
       }
-    } else {
-      // Use static headlines from database
-      console.log('📝 Using static headlines from config');
+    } catch (error) {
+      console.error('❌ Error loading headlines:', error);
+      console.log('📝 Falling back to default headlines');
       return config.headlines || getDefaultHeadlines();
     }
   }
