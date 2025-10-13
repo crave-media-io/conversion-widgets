@@ -165,8 +165,30 @@
   }
 
   // ============================================
-  // PERFORMANCE TRACKING
+  // PERFORMANCE TRACKING (LOCAL + SUPABASE)
   // ============================================
+  async function sendToSupabase(eventType, variant) {
+    try {
+      await fetch(SUPABASE.url + '/rest/v1/headline_performance', {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE.key,
+          'Authorization': 'Bearer ' + SUPABASE.key,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          client_id: CLIENT_ID,
+          page_url: window.location.pathname,
+          headline: variant.headline,
+          event_type: eventType
+        })
+      });
+    } catch (error) {
+      console.error('Error sending to Supabase:', error);
+    }
+  }
+
   function trackImpression(variant) {
     const perfData = getPerformanceData();
     const key = variant.headline;
@@ -187,6 +209,9 @@
     
     savePerformanceData(perfData);
     console.log('📊 Sidebar impression:', key);
+    
+    // Send to Supabase for dashboard analytics
+    sendToSupabase('impression', variant);
   }
 
   function trackConversion(variant) {
@@ -204,6 +229,9 @@
         impressions: perfData[key].impressions,
         rate: rate + '%'
       });
+      
+      // Send to Supabase for dashboard analytics
+      sendToSupabase('conversion', variant);
     }
   }
 
