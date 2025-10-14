@@ -714,7 +714,9 @@
     const headlines = await getHeadlines(state.config);
     const variants = createVariantsFromHeadlines(headlines);
     
-    const selectedVariant = variants[0];
+    // Use aggregate stats from Supabase to select best performer
+    // Falls back to local stats if Supabase unavailable
+    const selectedVariant = await selectBestVariantAggregate(variants);
     
     // Auto-show after delay
     setTimeout(() => {
