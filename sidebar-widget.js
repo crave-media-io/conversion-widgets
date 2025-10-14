@@ -267,6 +267,67 @@
     return bestVariant;
   }
 
+  async function selectBestVariantAggregate(variants) {
+    const epsilon = 0.2;
+    
+    // Random exploration 20% of the time
+    if (Math.random() < epsilon) {
+      const randomVariant = variants[Math.floor(Math.random() * variants.length)];
+      console.log('🎲 Exploring (random):', randomVariant.headline);
+      return randomVariant;
+    }
+    
+    // Fetch aggregate stats from Supabase
+    try {
+      const response = await fetch(
+        SUPABASE.url + '/rest/v1/headline_stats?client_id=eq.' + CLIENT_ID + '&page_url=eq.' + window.location.pathname,
+        {
+          headers: {
+            'apikey': SUPABASE.key,
+            'Authorization': 'Bearer ' + SUPABASE.key
+          }
+        }
+      );
+      
+      const stats = await response.json();
+      
+      if (!stats || stats.length === 0) {
+        console.log('📊 No stats yet, showing first headline');
+        return variants[0];
+      }
+      
+      // Find best performing headline from aggregate data
+      let bestHeadline = null;
+      let bestRate = 0;
+      
+      stats.forEach(stat => {
+        if (stat.conversion_rate > bestRate) {
+          bestRate = stat.conversion_rate;
+          bestHeadline = stat.headline;
+        }
+      });
+      
+      if (!bestHeadline) {
+        return variants[0];
+      }
+      
+      // Find matching variant
+      const bestVariant = variants.find(v => v.headline === bestHeadline);
+      
+      if (bestVariant) {
+        console.log('🏆 Global winner (' + bestRate + '%):', bestHeadline);
+        return bestVariant;
+      }
+      
+      return variants[0];
+      
+    } catch (error) {
+      console.error('Error fetching aggregate stats:', error);
+      // Fallback to local selection
+      return selectBestVariant(variants);
+    }
+  }
+
   function showAnalytics() {
     const perfData = getPerformanceData();
     console.log('\n📊 === SIDEBAR PERFORMANCE ANALYTICS ===');
