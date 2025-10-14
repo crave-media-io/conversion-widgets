@@ -629,7 +629,7 @@
     // Handle dismissal
     if (dismissBtn) {
       dismissBtn.addEventListener('click', () => {
-        trackDismissal(variant);
+        trackDismissal(state.currentVariant);
         hideSidebar();
       });
     }
@@ -669,6 +669,10 @@
       state.currentIndex = (state.currentIndex + 1) % variants.length;
       const nextVariant = variants[state.currentIndex];
       
+      // Update state IMMEDIATELY before animation
+      state.currentVariant = nextVariant;
+      trackImpression(nextVariant);
+      
       // Fade transition
       const headlineEl = document.getElementById('sidebar-headline');
       const messageEl = document.getElementById('sidebar-message');
@@ -680,8 +684,6 @@
         setTimeout(() => {
           headlineEl.textContent = nextVariant.headline;
           messageEl.textContent = nextVariant.message;
-          trackImpression(nextVariant);
-          state.currentVariant = nextVariant;
         }, 300);
       }
     }, 10000); // 10 seconds
@@ -691,7 +693,7 @@
   // INITIALIZATION
   // ============================================
   async function init() {
-    console.log('📍 AI-Powered Sidebar initializing...');
+    console.log('🚀 AI-Powered Sidebar initializing...');
     console.log('🆔 Client ID:', CLIENT_ID);
     
     // Fetch config from Supabase
@@ -704,7 +706,7 @@
     
     // Check if dismissed today
     if (isDismissedToday()) {
-      console.log('⏸️  Sidebar was dismissed today, skipping');
+      console.log('⏸️ Sidebar was dismissed today, skipping');
       return;
     }
     
