@@ -558,18 +558,11 @@
             border-top: 1px solid rgba(255, 255, 255, 0.2);
           ">
             <p style="
-              margin: 0 0 8px 0;
+              margin: 0;
               font-size: 12px;
               opacity: 0.6;
             ">
               ${config.business_name}
-            </p>
-            <p style="
-              margin: 0;
-              font-size: 11px;
-              opacity: 0.5;
-            ">
-              ${variant.style} | ${perfData.conversions}/${perfData.impressions} (${rate})
             </p>
           </div>
         </div>
