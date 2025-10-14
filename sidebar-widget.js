@@ -614,14 +614,14 @@
     
     // Track conversions
     ctaBtn.addEventListener('click', () => {
-      trackConversion(variant);
-      
+      trackConversion(state.currentVariant);
+
       if (window.gtag) {
         gtag('event', 'conversion', {
           'event_category': 'Sidebar Widget',
           'event_label': state.config.button_type,
-          'variant': variant.headline,
-          'variant_style': variant.style
+          'variant': state.currentVariant.headline,
+          'variant_style': state.currentVariant.style
         });
       }
     });
