@@ -406,10 +406,7 @@
       ? `left: -380px; right: auto;`
       : `right: -380px; left: auto;`;
 
-    const perfData = getPerformanceData()[variant.headline] || { impressions: 0, conversions: 0 };
-    const rate = perfData.impressions > 0 
-      ? ((perfData.conversions / perfData.impressions) * 100).toFixed(1) + '%'
-      : '0%';
+    const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
     return `
       <div id="vertical-sidebar" style="
@@ -422,8 +419,8 @@
         background: ${config.brand_color ? `linear-gradient(180deg, ${config.brand_color} 0%, ${adjustColor(config.brand_color, -20)} 100%)` : 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)'};
         color: #ffffff;
         box-shadow: ${(config.position === 'left') ? '4px' : '-4px'} 0 30px rgba(0, 0, 0, 0.4);
-        z-index: 9999999;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        z-index: 2147483000;
+        font-family: ${fontFamily};
         transition: ${(config.position === 'left') ? 'left' : 'right'} 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         overflow-y: auto;
         display: flex;
@@ -481,6 +478,7 @@
           justify-content: center;
           font-weight: bold;
           z-index: 10;
+          font-family: inherit;
         " onmouseover="this.style.background='rgba(255,255,255,0.4)'; this.style.transform='rotate(90deg)'" 
            onmouseout="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='rotate(0deg)'">
           ×
@@ -506,6 +504,7 @@
               font-size: 32px;
               font-weight: 700;
               line-height: 1.2;
+              font-family: inherit;
             ">
               ${variant.headline}
             </h2>
@@ -515,6 +514,7 @@
               font-size: 18px;
               line-height: 1.6;
               opacity: 0.95;
+              font-family: inherit;
             ">
               ${variant.message}
             </p>
@@ -535,6 +535,7 @@
             transition: all 0.3s;
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
             margin-bottom: 20px;
+            font-family: inherit;
           " onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,0.4)'"
              onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.3)'">
             ${buttonText}
@@ -547,6 +548,7 @@
               font-weight: 600;
               margin: 0 0 40px 0;
               opacity: 0.95;
+              font-family: inherit;
             ">
               ${config.phone_number}
             </p>
@@ -561,6 +563,7 @@
               margin: 0;
               font-size: 12px;
               opacity: 0.6;
+              font-family: inherit;
             ">
               ${config.business_name}
             </p>
@@ -769,4 +772,3 @@
     init();
   }
 })();
-
