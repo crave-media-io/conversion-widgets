@@ -258,17 +258,21 @@
       ? `tel:${config.phone_number.replace(/\D/g, '')}`
       : config.booking_url;
 
+    const borderColor = config.banner_border_color || config.brand_color || '#667eea';
+    const bgColor = config.banner_bg_color || '#ffffff';
+    const buttonColor = config.brand_color || '#667eea';
+
     return `
       <div id="header-banner-widget" style="
         max-width: 800px;
         margin: 20px auto;
         padding: 30px 40px;
-        background: #ffffff;
-        border: 2px solid ${config.brand_color || '#667eea'};
+        background: ${bgColor};
+        border: 2px solid ${borderColor};
         border-radius: 12px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         text-align: center;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: inherit;
       ">
         <style>
           @keyframes fadeHeadline {
@@ -305,7 +309,7 @@
            id="banner-cta-btn"
            style="
           display: inline-block;
-          background: ${config.brand_color || '#667eea'};
+          background: ${buttonColor};
           color: white;
           padding: 16px 36px;
           border-radius: 8px;
@@ -348,8 +352,13 @@
     container.innerHTML = createBannerHTML(variant, state.config);
     const banner = container.firstElementChild;
     
-    // Insert at beginning of body
-    document.body.insertBefore(banner, document.body.firstChild);
+    // Insert banner where the script tag is located
+    if (scriptTag && scriptTag.parentNode) {
+      scriptTag.parentNode.insertBefore(banner, scriptTag);
+    } else {
+      // Fallback: insert at beginning of body
+      document.body.insertBefore(banner, document.body.firstChild);
+    }
     
     // Track conversions
     const ctaBtn = document.getElementById('banner-cta-btn');
