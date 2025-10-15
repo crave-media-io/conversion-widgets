@@ -503,7 +503,7 @@
               margin-bottom: 20px;
               opacity: 0.9;
             ">
-              💬
+              ${sidebarIcon}
             </div>
             
             <h2 id="sidebar-headline" style="
@@ -745,6 +745,11 @@
     
     // Global functions
     window.showSidebarAnalytics = showAnalytics;
+    
+    window.showSidebarConfig = function() {
+      console.log('Current sidebar config:', state.config);
+      console.log('Sidebar icon:', state.config?.sidebar_icon);
+    };
     
     window.clearSidebarData = function() {
       localStorage.removeItem('sidebarPerformance_' + CLIENT_ID);
