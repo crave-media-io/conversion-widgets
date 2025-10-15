@@ -408,6 +408,7 @@
       : `right: -380px; left: auto;`;
 
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    const sidebarIcon = config.sidebar_icon || '💬';
 
     return `
       <div id="vertical-sidebar" style="
