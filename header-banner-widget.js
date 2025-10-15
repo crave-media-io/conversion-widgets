@@ -261,6 +261,7 @@
     const borderColor = config.banner_border_color || config.brand_color || '#667eea';
     const bgColor = config.banner_bg_color || '#ffffff';
     const buttonColor = config.brand_color || '#667eea';
+    const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
     return `
       <div id="header-banner-widget" style="
@@ -272,7 +273,7 @@
         border-radius: 12px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         text-align: center;
-        font-family: inherit;
+        font-family: ${fontFamily};
       ">
         <style>
           @keyframes fadeHeadline {
@@ -317,6 +318,7 @@
           text-decoration: none;
           font-weight: 700;
           font-size: 16px;
+          font-family: inherit;
           transition: all 0.3s;
           box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(102,126,234,0.4)'"
