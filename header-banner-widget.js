@@ -301,6 +301,7 @@
           font-weight: 700;
           line-height: 1.3;
           color: #333;
+          font-family: inherit;
         ">
           ${variant.headline}
         </h2>
