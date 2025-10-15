@@ -489,8 +489,13 @@
           max-width: 100%;
           width: 100%;
           box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
         ">
-          <div style="text-align: center; margin-bottom: 40px;">
+          <div style="text-align: center; margin-bottom: 40px; width: 100%;">
             <div style="
               font-size: 60px;
               margin-bottom: 20px;
@@ -520,53 +525,55 @@
             </p>
           </div>
           
-          <a href="${buttonLink}" 
-             id="sidebar-cta-btn"
-             style="
-            display: block;
-            background: white;
-            color: ${config.brand_color || '#667eea'};
-            padding: 20px 32px;
-            border-radius: 12px;
-            text-decoration: none;
-            font-weight: 700;
-            font-size: 18px;
-            text-align: center;
-            transition: all 0.3s;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-            margin-bottom: 20px;
-            font-family: inherit;
-          " onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,0.4)'"
-             onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.3)'">
-            ${buttonText}
-          </a>
-          
-          ${config.button_type === 'call' ? `
-            <p style="
+          <div style="width: 100%;">
+            <a href="${buttonLink}" 
+               id="sidebar-cta-btn"
+               style="
+              display: block;
+              background: white;
+              color: ${config.brand_color || '#667eea'};
+              padding: 20px 32px;
+              border-radius: 12px;
+              text-decoration: none;
+              font-weight: 700;
+              font-size: 18px;
               text-align: center;
-              font-size: 22px;
-              font-weight: 600;
-              margin: 0 0 40px 0;
-              opacity: 0.95;
+              transition: all 0.3s;
+              box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+              margin-bottom: 20px;
               font-family: inherit;
+            " onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,0.4)'"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.3)'">
+              ${buttonText}
+            </a>
+            
+            ${config.button_type === 'call' ? `
+              <p style="
+                text-align: center;
+                font-size: 22px;
+                font-weight: 600;
+                margin: 0 0 40px 0;
+                opacity: 0.95;
+                font-family: inherit;
+              ">
+                ${config.phone_number}
+              </p>
+            ` : ''}
+            
+            <div style="
+              text-align: center;
+              padding-top: 40px;
+              border-top: 1px solid rgba(255, 255, 255, 0.2);
             ">
-              ${config.phone_number}
-            </p>
-          ` : ''}
-          
-          <div style="
-            text-align: center;
-            padding-top: 40px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-          ">
-            <p style="
-              margin: 0;
-              font-size: 12px;
-              opacity: 0.6;
-              font-family: inherit;
-            ">
-              ${config.business_name}
-            </p>
+              <p style="
+                margin: 0;
+                font-size: 12px;
+                opacity: 0.6;
+                font-family: inherit;
+              ">
+                ${config.business_name}
+              </p>
+            </div>
           </div>
         </div>
       </div>
