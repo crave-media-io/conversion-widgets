@@ -382,10 +382,11 @@
   // ============================================
   function createVariantsFromHeadlines(headlines) {
     const styles = ['helpful', 'urgency', 'social-proof', 'risk-reversal', 'discount'];
+    const defaultMessage = state.config.sidebar_subline || "We're here to help you get started. Reach out today!";
     
     return headlines.map((headline, index) => ({
       headline: headline,
-      message: "We're here to help you get started. Reach out today!",
+      message: defaultMessage,
       style: styles[index % styles.length]
     }));
   }
