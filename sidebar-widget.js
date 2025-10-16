@@ -73,12 +73,13 @@
       return JSON.parse(cached);
     }
 
-    // Load page-specific headlines from Supabase
     try {
       console.log('📋 Loading headlines for page:', window.location.pathname);
+      const currentPath = window.location.pathname;
       
-      const response = await fetch(
-        `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}&page_url=eq.${encodeURIComponent(window.location.pathname)}`,
+      // First, try exact match on page_url
+      let response = await fetch(
+        `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}&page_url=eq.${encodeURIComponent(currentPath)}`,
         {
           headers: {
             'apikey': SUPABASE.key,
@@ -87,7 +88,64 @@
         }
       );
       
-      const data = await response.json();
+      let data = await response.json();
+      
+      // If no exact match, fetch all headlines and check additional_urls
+      if (!data || data.length === 0) {
+        console.log('🔍 No exact match, checking additional URLs...');
+        
+        response = await fetch(
+          `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}`,
+          {
+            headers: {
+              'apikey': SUPABASE.key,
+              'Authorization': `Bearer ${SUPABASE.key}`
+            }
+          }
+        );
+        
+        const allPages = await response.json();
+        
+        // Find a page where current path matches additional_urls or wildcard patterns
+        for (let i = 0; i < allPages.length; i++) {
+          const page = allPages[i];
+          
+          // Check if current path is in excluded_urls
+          if (page.excluded_urls && page.excluded_urls.length > 0) {
+            const isExcluded = page.excluded_urls.some(excludedUrl => {
+              if (excludedUrl.includes('*')) {
+                // Convert wildcard to regex
+                const pattern = '^' + excludedUrl.replace(/\*/g, '.*') + '$';
+                return new RegExp(pattern).test(currentPath);
+              }
+              return currentPath === excludedUrl;
+            });
+            
+            if (isExcluded) {
+              console.log('🚫 Page is excluded by:', page.page_url);
+              continue;
+            }
+          }
+          
+          // Check if current path matches additional_urls
+          if (page.additional_urls && page.additional_urls.length > 0) {
+            const isMatch = page.additional_urls.some(additionalUrl => {
+              if (additionalUrl.includes('*')) {
+                // Convert wildcard to regex
+                const pattern = '^' + additionalUrl.replace(/\*/g, '.*') + '$';
+                return new RegExp(pattern).test(currentPath);
+              }
+              return currentPath === additionalUrl;
+            });
+            
+            if (isMatch) {
+              console.log('✅ Found match in additional URLs for:', page.page_url);
+              data = [page];
+              break;
+            }
+          }
+        }
+      }
       
       if (data && data.length > 0 && data[0].headlines) {
         console.log('✅ Page-specific headlines loaded:', data[0].headlines);
