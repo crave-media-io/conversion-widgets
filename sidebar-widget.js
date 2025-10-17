@@ -764,7 +764,7 @@
   // ============================================
   async function init() {
     console.log('🚀 AI-Powered Sidebar initializing...');
-    console.log('📦 Widget Version: v3.0 - Additional URLs Support');
+    console.log('📦 Widget Version: v3.1 - No Regex Edition');
     console.log('🆔 Client ID:', CLIENT_ID);
     
     // Fetch config from Supabase
