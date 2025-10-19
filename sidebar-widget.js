@@ -780,7 +780,7 @@
 
   async function init() {
     console.log('🚀 AI-Powered Sidebar initializing...');
-    console.log('📦 Widget Version: v50 - Clean Build');
+    console.log('📦 Widget Version: v50.1 - Exclusion Priority Fix');
     console.log('🆔 Client ID:', CLIENT_ID);
     
     if (window.TEST_PATH) {
