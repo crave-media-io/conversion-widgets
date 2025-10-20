@@ -21,7 +21,8 @@
     currentVariant: null,
     currentIndex: 0,
     rotationTimer: null,
-    headlines: null
+    headlines: null,
+    canonicalPageUrl: null  // Store the canonical page URL for stats aggregation
   };
 
   // ============================================
@@ -60,19 +61,23 @@
   // FETCH HEADLINES
   // ============================================
   async function getHeadlines(config) {
-    const cacheKey = `banner_headlines_${CLIENT_ID}_${window.location.pathname}`;
+    const currentPath = window.location.pathname;
+    const cacheKey = `banner_headlines_${CLIENT_ID}_${currentPath}`;
     const cached = sessionStorage.getItem(cacheKey);
-    
+
     if (cached) {
       console.log('📦 Using cached headlines');
-      return JSON.parse(cached);
+      const cachedData = JSON.parse(cached);
+      state.canonicalPageUrl = cachedData.canonicalPageUrl || currentPath;
+      return cachedData.headlines;
     }
 
     try {
-      console.log('📋 Loading headlines for page:', window.location.pathname);
-      
-      const response = await fetch(
-        `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}&page_url=eq.${encodeURIComponent(window.location.pathname)}`,
+      console.log('📋 Loading headlines for page:', currentPath);
+
+      // First, try exact match
+      let response = await fetch(
+        `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}&page_url=eq.${encodeURIComponent(currentPath)}`,
         {
           headers: {
             'apikey': SUPABASE.key,
@@ -80,19 +85,81 @@
           }
         }
       );
-      
-      const data = await response.json();
-      
-      if (data && data.length > 0 && data[0].headlines) {
-        console.log('✅ Page-specific headlines loaded:', data[0].headlines);
-        sessionStorage.setItem(cacheKey, JSON.stringify(data[0].headlines));
-        return data[0].headlines;
+
+      let data = await response.json();
+
+      // If no exact match, check additional_urls
+      if (!data || data.length === 0) {
+        console.log('🔍 No exact match, checking additional URLs...');
+
+        // Fetch all pages for this client
+        response = await fetch(
+          `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}`,
+          {
+            headers: {
+              'apikey': SUPABASE.key,
+              'Authorization': `Bearer ${SUPABASE.key}`
+            }
+          }
+        );
+
+        const allPages = await response.json();
+
+        // Check each page's additional_urls for a match
+        for (let i = 0; i < allPages.length; i++) {
+          const page = allPages[i];
+          let additionalUrls = page.additional_urls || [];
+
+          // Handle string parsing if needed
+          if (typeof additionalUrls === 'string') {
+            try {
+              additionalUrls = JSON.parse(additionalUrls);
+            } catch (e) {
+              additionalUrls = [];
+            }
+          }
+
+          if (!Array.isArray(additionalUrls)) additionalUrls = [];
+
+          // Check for wildcard matches
+          for (let j = 0; j < additionalUrls.length; j++) {
+            const urlPattern = additionalUrls[j];
+            let isMatch = false;
+
+            if (urlPattern.includes('*')) {
+              // Simple wildcard matching
+              const pattern = urlPattern.replace(/\*/g, '.*');
+              const regex = new RegExp('^' + pattern + '$');
+              isMatch = regex.test(currentPath);
+            } else {
+              isMatch = currentPath === urlPattern;
+            }
+
+            if (isMatch) {
+              console.log('✅ Found match via additional_urls:', page.page_url);
+              state.canonicalPageUrl = page.page_url;
+              const result = { headlines: page.headlines, canonicalPageUrl: page.page_url };
+              sessionStorage.setItem(cacheKey, JSON.stringify(result));
+              return page.headlines;
+            }
+          }
+        }
       } else {
-        console.log('📝 No page-specific headlines, using defaults');
-        return config.headlines || getDefaultHeadlines();
+        // Exact match found
+        console.log('✅ Page-specific headlines loaded:', data[0].headlines);
+        state.canonicalPageUrl = data[0].page_url;
+        const result = { headlines: data[0].headlines, canonicalPageUrl: data[0].page_url };
+        sessionStorage.setItem(cacheKey, JSON.stringify(result));
+        return data[0].headlines;
       }
+
+      // No match found
+      console.log('📝 No page-specific headlines, using defaults');
+      state.canonicalPageUrl = currentPath;
+      return config.headlines || getDefaultHeadlines();
     } catch (error) {
       console.error('❌ Error loading headlines:', error);
+      state.canonicalPageUrl = currentPath;
       return config.headlines || getDefaultHeadlines();
     }
   }
@@ -126,6 +193,10 @@
   }
 
   async function sendToSupabase(eventType, variant) {
+    // Use canonical page URL for metrics aggregation across matching pages
+    const canonicalUrl = state.canonicalPageUrl || window.location.pathname;
+    const actualUrl = window.location.pathname;
+
     try {
       await fetch(SUPABASE.url + '/rest/v1/headline_performance', {
         method: 'POST',
@@ -137,7 +208,8 @@
         },
         body: JSON.stringify({
           client_id: CLIENT_ID,
-          page_url: window.location.pathname,
+          page_url: canonicalUrl,
+          actual_url: actualUrl,
           headline: variant.headline,
           event_type: eventType
         })
