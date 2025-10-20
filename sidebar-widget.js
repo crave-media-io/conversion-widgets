@@ -789,7 +789,7 @@
 
   async function init() {
     console.log('🚀 AI-Powered Sidebar initializing...');
-    console.log('📦 Widget Version: v50.2 - Per-URL Breakdown Tracking');
+    console.log('📦 Widget Version: v50.3 - Per-URL Breakdown Tracking');
     console.log('🆔 Client ID:', CLIENT_ID);
     
     if (window.TEST_PATH) {
