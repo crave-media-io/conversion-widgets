@@ -18,7 +18,8 @@
     isDismissed: false,
     rotationTimer: null,
     isVisible: false,
-    headlines: null
+    headlines: null,
+    canonicalPageUrl: null
   };
 
   async function fetchClientConfig() {
@@ -54,7 +55,7 @@
     const currentPath = window.TEST_PATH || window.location.pathname;
     const cacheKey = `headlines_${CLIENT_ID}_${currentPath}`;
     const cached = sessionStorage.getItem(cacheKey);
-    
+
     if (cached) {
       console.log('📦 Using cached headlines');
       return JSON.parse(cached);
@@ -62,7 +63,7 @@
 
     try {
       console.log('📋 Loading headlines for page:', currentPath);
-      
+
       let response = await fetch(
         `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}&page_url=eq.${encodeURIComponent(currentPath)}`,
         {
@@ -72,12 +73,12 @@
           }
         }
       );
-      
+
       let data = await response.json();
-      
+
       if (!data || data.length === 0) {
         console.log('🔍 No exact match, checking additional URLs...');
-        
+
         response = await fetch(
           `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}`,
           {
@@ -87,16 +88,16 @@
             }
           }
         );
-        
+
         const allPages = await response.json();
         var isPageExcluded = false;
-        
+
         for (var i = 0; i < allPages.length; i++) {
           const page = allPages[i];
-          
+
           var additionalUrls = page.additional_urls;
           var excludedUrls = page.excluded_urls;
-          
+
           if (typeof additionalUrls === 'string') {
             try {
               additionalUrls = JSON.parse(additionalUrls);
@@ -104,7 +105,7 @@
               additionalUrls = [];
             }
           }
-          
+
           if (typeof excludedUrls === 'string') {
             try {
               excludedUrls = JSON.parse(excludedUrls);
@@ -112,14 +113,14 @@
               excludedUrls = [];
             }
           }
-          
+
           if (!Array.isArray(additionalUrls)) additionalUrls = [];
           if (!Array.isArray(excludedUrls)) excludedUrls = [];
-          
+
           console.log('🔍 Checking page:', page.page_url);
           console.log('   Additional URLs:', additionalUrls);
           console.log('   Excluded URLs:', excludedUrls);
-          
+
           if (excludedUrls && excludedUrls.length > 0) {
             var isExcluded = false;
             for (var j = 0; j < excludedUrls.length; j++) {
@@ -146,20 +147,20 @@
                 break;
               }
             }
-            
+
             if (isExcluded) {
               console.log('🚫 Page is excluded by:', page.page_url);
               isPageExcluded = true;
               continue;
             }
           }
-          
+
           if (additionalUrls && additionalUrls.length > 0) {
             var foundMatch = false;
             for (var j = 0; j < additionalUrls.length; j++) {
               var additionalUrl = additionalUrls[j];
               console.log('   Testing:', additionalUrl, 'against', currentPath);
-              
+
               if (additionalUrl.indexOf('*') !== -1) {
                 var parts = additionalUrl.split('*');
                 var match = true;
@@ -187,7 +188,7 @@
                 }
               }
             }
-            
+
             if (foundMatch) {
               console.log('✅ Found match in additional URLs for:', page.page_url);
               data = [page];
@@ -196,23 +197,27 @@
           }
         }
       }
-      
+
       if (isPageExcluded) {
         console.log('⛔ Page is excluded - sidebar will not show');
         return null;
       }
-      
+
       if (data && data.length > 0 && data[0].headlines) {
         console.log('✅ Page-specific headlines loaded:', data[0].headlines);
+        // Store the canonical page_url for metrics aggregation
+        state.canonicalPageUrl = data[0].page_url;
         sessionStorage.setItem(cacheKey, JSON.stringify(data[0].headlines));
         return data[0].headlines;
       } else {
         console.log('📝 No page-specific headlines, using defaults');
+        state.canonicalPageUrl = currentPath;
         return config.headlines || getDefaultHeadlines();
       }
     } catch (error) {
       console.error('❌ Error loading headlines:', error);
       console.log('📝 Falling back to default headlines');
+      state.canonicalPageUrl = currentPath;
       return config.headlines || getDefaultHeadlines();
     }
   }
@@ -265,7 +270,9 @@
   }
 
   async function sendToSupabase(eventType, variant) {
-    const currentPath = window.TEST_PATH || window.location.pathname;
+    // Use canonical page URL for metrics aggregation across matching pages
+    const canonicalUrl = state.canonicalPageUrl || window.TEST_PATH || window.location.pathname;
+    const actualUrl = window.TEST_PATH || window.location.pathname;
     try {
       await fetch(SUPABASE.url + '/rest/v1/headline_performance', {
         method: 'POST',
@@ -277,7 +284,8 @@
         },
         body: JSON.stringify({
           client_id: CLIENT_ID,
-          page_url: currentPath,
+          page_url: canonicalUrl,
+          actual_url: actualUrl,
           headline: variant.headline,
           event_type: eventType
         })
@@ -372,17 +380,18 @@
 
   async function selectBestVariantAggregate(variants) {
     const epsilon = 0.2;
-    const currentPath = window.TEST_PATH || window.location.pathname;
-    
+    // Use canonical page URL for consistent metrics lookup
+    const pageUrl = state.canonicalPageUrl || window.TEST_PATH || window.location.pathname;
+
     if (Math.random() < epsilon) {
       const randomVariant = variants[Math.floor(Math.random() * variants.length)];
       console.log('🎲 Exploring (random):', randomVariant.headline);
       return randomVariant;
     }
-    
+
     try {
       const response = await fetch(
-        SUPABASE.url + '/rest/v1/headline_stats?client_id=eq.' + CLIENT_ID + '&page_url=eq.' + currentPath,
+        SUPABASE.url + '/rest/v1/headline_stats?client_id=eq.' + CLIENT_ID + '&page_url=eq.' + encodeURIComponent(pageUrl),
         {
           headers: {
             'apikey': SUPABASE.key,
@@ -390,37 +399,37 @@
           }
         }
       );
-      
+
       const stats = await response.json();
-      
+
       if (!stats || stats.length === 0) {
         console.log('📊 No stats yet, showing first headline');
         return variants[0];
       }
-      
+
       let bestHeadline = null;
       let bestRate = 0;
-      
+
       stats.forEach(stat => {
         if (stat.conversion_rate > bestRate) {
           bestRate = stat.conversion_rate;
           bestHeadline = stat.headline;
         }
       });
-      
+
       if (!bestHeadline) {
         return variants[0];
       }
-      
+
       const bestVariant = variants.find(v => v.headline === bestHeadline);
-      
+
       if (bestVariant) {
         console.log('🏆 Global winner (' + bestRate + '%):', bestHeadline);
         return bestVariant;
       }
-      
+
       return variants[0];
-      
+
     } catch (error) {
       console.error('Error fetching aggregate stats:', error);
       return selectBestVariant(variants);
@@ -780,7 +789,7 @@
 
   async function init() {
     console.log('🚀 AI-Powered Sidebar initializing...');
-    console.log('📦 Widget Version: v50.1 - Exclusion Priority Fix');
+    console.log('📦 Widget Version: v50.2 - Per-URL Breakdown Tracking');
     console.log('🆔 Client ID:', CLIENT_ID);
     
     if (window.TEST_PATH) {
@@ -859,3 +868,4 @@
     init();
   }
 })();
+
