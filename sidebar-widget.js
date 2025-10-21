@@ -198,9 +198,14 @@
         }
       }
 
-      if (isPageExcluded) {
-        console.log('⛔ Page is excluded - sidebar will not show');
+      // Don't block if we found a specific match - explicit includes override exclusions
+      if (isPageExcluded && (!data || data.length === 0)) {
+        console.log('⛔ Page is excluded and no specific match found - sidebar will not show');
         return null;
+      }
+
+      if (isPageExcluded && data && data.length > 0) {
+        console.log('✅ Page was excluded by wildcard, but found specific include - showing sidebar');
       }
 
       if (data && data.length > 0 && data[0].headlines) {
@@ -789,7 +794,7 @@
 
   async function init() {
     console.log('🚀 AI-Powered Sidebar initializing...');
-    console.log('📦 Widget Version: v50.3 - Per-URL Breakdown Tracking');
+    console.log('📦 Widget Version: v50.4 - Per-URL Breakdown Tracking');
     console.log('🆔 Client ID:', CLIENT_ID);
     
     if (window.TEST_PATH) {
