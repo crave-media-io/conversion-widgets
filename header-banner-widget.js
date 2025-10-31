@@ -26,12 +26,49 @@
   };
 
   // ============================================
+  // DOMAIN VALIDATION
+  // ============================================
+  function isCurrentDomainAllowed(allowedDomains) {
+    // If no domains specified, allow all (fail-open for better UX)
+    if (!allowedDomains || allowedDomains.length === 0) {
+      return true;
+    }
+
+    const currentDomain = window.location.hostname.toLowerCase();
+
+    for (let i = 0; i < allowedDomains.length; i++) {
+      const allowed = allowedDomains[i].toLowerCase();
+
+      // Exact match
+      if (currentDomain === allowed) {
+        return true;
+      }
+
+      // Auto-include www subdomain
+      if (currentDomain === 'www.' + allowed || allowed === 'www.' + currentDomain) {
+        return true;
+      }
+
+      // Wildcard support (*.example.com)
+      if (allowed.startsWith('*.')) {
+        const baseDomain = allowed.substring(2); // Remove *.
+        if (currentDomain === baseDomain || currentDomain.endsWith('.' + baseDomain)) {
+          return true;
+        }
+      }
+    }
+
+    console.log('🚫 Domain not allowed:', currentDomain, 'Allowed:', allowedDomains);
+    return false;
+  }
+
+  // ============================================
   // FETCH CONFIG FROM SUPABASE
   // ============================================
   async function fetchClientConfig() {
     try {
       console.log('🎯 Fetching banner config for client:', CLIENT_ID);
-      
+
       const response = await fetch(
         `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}`,
         {
@@ -41,12 +78,20 @@
           }
         }
       );
-      
+
       const data = await response.json();
-      
+
       if (data && data.length > 0) {
-        console.log('✅ Banner config loaded:', data[0].business_name);
-        return data[0];
+        const config = data[0];
+
+        // Check domain restrictions
+        if (!isCurrentDomainAllowed(config.allowed_domains)) {
+          console.log('🚫 Widget blocked: Domain not in allowed list');
+          return null;
+        }
+
+        console.log('✅ Banner config loaded:', config.business_name);
+        return config;
       } else {
         console.error('❌ No config found for client:', CLIENT_ID);
         return null;
@@ -346,6 +391,7 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         text-align: center;
         font-family: ${fontFamily};
+        position: relative;
       ">
         <style>
           @keyframes fadeHeadline {
@@ -365,9 +411,28 @@
               padding: 14px 28px !important;
               font-size: 15px !important;
             }
+            #banner-branding {
+              position: static !important;
+              margin-top: 15px !important;
+            }
           }
         </style>
-        
+
+        ${config.show_branding !== false ? `
+        <div id="banner-branding" style="
+          position: absolute;
+          top: 8px;
+          right: 12px;
+          font-size: 9px;
+          opacity: 0.4;
+          font-family: inherit;
+        ">
+          <a href="https://cravemedia.io" target="_blank" rel="noopener noreferrer" style="color: #666; text-decoration: none;">
+            Powered by cravemedia.io
+          </a>
+        </div>
+        ` : ''}
+
         <h2 id="banner-headline" style="
           margin: 0 0 20px 0;
           font-size: 28px;
