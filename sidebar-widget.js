@@ -22,10 +22,100 @@
     canonicalPageUrl: null
   };
 
+  function checkDomainMatch(allowedDomain) {
+    // If no domain specified, allow all (backward compatibility)
+    if (!allowedDomain) {
+      return true;
+    }
+
+    const currentDomain = window.location.hostname.toLowerCase();
+    const cleanCurrent = currentDomain.replace(/^www\./, '');
+    const cleanAllowed = allowedDomain.toLowerCase().replace(/^www\./, '');
+
+    // Special case: allow localhost for development
+    if (currentDomain === 'localhost' || currentDomain === '127.0.0.1') {
+      console.log('ℹ️ Localhost detected - allowing for development');
+      return true;
+    }
+
+    if (cleanCurrent !== cleanAllowed) {
+      console.warn(`🚫 Widget blocked: Domain mismatch. Expected ${cleanAllowed}, got ${cleanCurrent}`);
+      return false;
+    }
+
+    return true;
+  }
+
+  async function checkIfSiteActive(clientId) {
+    try {
+      const response = await fetch(
+        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${clientId}&select=status`,
+        {
+          headers: {
+            'apikey': SUPABASE.key,
+            'Authorization': `Bearer ${SUPABASE.key}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        console.warn('⚠️ Failed to check site status - allowing widget (fail open)');
+        return true;
+      }
+
+      const data = await response.json();
+      const status = data[0]?.status || 'active';
+
+      if (status === 'suspended') {
+        console.log('🚫 Site is suspended - upgrade your plan to reactivate');
+        return false;
+      }
+
+      return true;
+
+    } catch (error) {
+      console.warn('⚠️ Error checking site status:', error);
+      return true;
+    }
+  }
+
+  async function checkIfWidgetEnabled(widgetName, clientId) {
+    try {
+      const response = await fetch(
+        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${clientId}&select=enabled_widgets`,
+        {
+          headers: {
+            'apikey': SUPABASE.key,
+            'Authorization': `Bearer ${SUPABASE.key}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        console.warn('⚠️ Failed to check widget status - allowing widget (fail open)');
+        return true; // Fail open - allow widget if can't verify
+      }
+
+      const data = await response.json();
+      const enabledWidgets = data[0]?.enabled_widgets || [];
+
+      if (!enabledWidgets.includes(widgetName)) {
+        console.log(`🚫 Widget "${widgetName}" not enabled for client ${clientId}`);
+        return false;
+      }
+
+      return true;
+
+    } catch (error) {
+      console.warn('⚠️ Error checking widget status:', error);
+      return true; // Fail open - allow widget if error occurs
+    }
+  }
+
   async function fetchClientConfig() {
     try {
       console.log('🔍 Fetching config for client:', CLIENT_ID);
-      
+
       const response = await fetch(
         `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}`,
         {
@@ -35,12 +125,13 @@
           }
         }
       );
-      
+
       const data = await response.json();
-      
+
       if (data && data.length > 0) {
-        console.log('✅ Config loaded:', data[0].business_name);
-        return data[0];
+        const config = data[0];
+        console.log('✅ Config loaded:', config.business_name);
+        return config;
       } else {
         console.error('❌ No config found for client:', CLIENT_ID);
         return null;
@@ -681,6 +772,18 @@
               ">
                 ${config.business_name}
               </p>
+              ${config.show_branding !== false ? `
+              <p style="
+                margin: 10px 0 0 0;
+                font-size: 10px;
+                opacity: 0.5;
+                font-family: inherit;
+              ">
+                <a href="https://cravemedia.io" target="_blank" rel="noopener noreferrer" style="color: rgba(255, 255, 255, 0.7); text-decoration: none;">
+                  Powered by cravemedia.io
+                </a>
+              </p>
+              ` : ''}
             </div>
           </div>
         </div>
@@ -794,17 +897,38 @@
 
   async function init() {
     console.log('🚀 AI-Powered Sidebar initializing...');
-    console.log('📦 Widget Version: v50.4 - Per-URL Breakdown Tracking');
+    console.log('📦 Widget Version: v50.4 - Multi-Site + Enforcement');
     console.log('🆔 Client ID:', CLIENT_ID);
-    
+
     if (window.TEST_PATH) {
       console.log('🧪 TEST MODE: Simulating path:', window.TEST_PATH);
     }
-    
+
     state.config = await fetchClientConfig();
-    
+
     if (!state.config) {
       console.error('❌ Could not load config. Widget will not display.');
+      return;
+    }
+
+    // Check if site is active (not suspended)
+    const isActive = await checkIfSiteActive(CLIENT_ID);
+    if (!isActive) {
+      console.log('🚫 Widget blocked: Site is suspended');
+      return;
+    }
+
+    // Check domain authorization
+    const domainOk = checkDomainMatch(state.config.domain);
+    if (!domainOk) {
+      console.log('🚫 Widget blocked: Unauthorized domain');
+      return;
+    }
+
+    // Check if widget is enabled for this client
+    const isEnabled = await checkIfWidgetEnabled('sidebar', CLIENT_ID);
+    if (!isEnabled) {
+      console.log('🚫 Widget blocked: Not enabled for this client');
       return;
     }
     
