@@ -380,8 +380,39 @@
     }
   }
 
+  function shouldInterceptPhone(telHref) {
+    const phoneMatchMode = state.config.after_hours_phone_match_mode || 'all';
+
+    // If matching all phones, always intercept
+    if (phoneMatchMode === 'all') {
+      return true;
+    }
+
+    // If specific mode, check if this phone matches the target
+    if (phoneMatchMode === 'specific') {
+      const targetPhone = state.config.after_hours_target_phone;
+      if (!targetPhone) {
+        console.warn('⚠️ Specific phone match mode enabled but no target phone set. Defaulting to match all.');
+        return true;
+      }
+
+      // Extract phone number from tel: link
+      const linkPhone = telHref.replace('tel:', '').trim();
+      const normalizedLink = normalizePhoneNumber(linkPhone);
+      const normalizedTarget = normalizePhoneNumber(targetPhone);
+
+      const matches = normalizedLink === normalizedTarget;
+      if (!matches) {
+        console.log(`📞 Skipping phone ${linkPhone} (doesn't match target ${targetPhone})`);
+      }
+      return matches;
+    }
+
+    return true;
+  }
+
   function interceptTelLinks() {
-    // Intercept all tel: link clicks
+    // Intercept tel: link clicks based on matching mode
     document.addEventListener('click', (e) => {
       if (!state.isAfterHours || !state.isMobile) return;
 
@@ -392,13 +423,22 @@
       }
 
       if (target && target.href && target.href.startsWith('tel:')) {
-        e.preventDefault();
-        e.stopPropagation();
-        showPopup(target.href);
+        // Check if we should intercept this specific phone number
+        if (shouldInterceptPhone(target.href)) {
+          e.preventDefault();
+          e.stopPropagation();
+          showPopup(target.href);
+        }
       }
     }, true); // Use capture phase to intercept before other handlers
 
-    console.log('📞 Mobile tel: link interception active');
+    const matchMode = state.config.after_hours_phone_match_mode || 'all';
+    if (matchMode === 'specific') {
+      console.log('📞 Mobile tel: link interception active (specific number mode)');
+      console.log('   Target phone:', state.config.after_hours_target_phone);
+    } else {
+      console.log('📞 Mobile tel: link interception active (all numbers)');
+    }
   }
 
   function normalizePhoneNumber(phone) {
@@ -415,7 +455,13 @@
   function replacePhoneNumbers() {
     if (state.isMobile) return; // Only run on desktop
 
-    console.log('🔍 Scanning page for phone numbers...');
+    const phoneMatchMode = state.config.after_hours_phone_match_mode || 'all';
+    if (phoneMatchMode === 'specific') {
+      console.log('🔍 Scanning page for phone numbers (specific number mode)...');
+      console.log('   Target phone:', state.config.after_hours_target_phone);
+    } else {
+      console.log('🔍 Scanning page for phone numbers (all numbers)...');
+    }
 
     // Parse vanity numbers from config if provided
     const vanityNumbers = [];
@@ -496,6 +542,19 @@
 
         replacedPhones.add(phoneText);
         const normalizedPhone = normalizePhoneNumber(phoneText);
+
+        // Check if we should replace this phone number based on matching mode
+        const phoneMatchMode = state.config.after_hours_phone_match_mode || 'all';
+        if (phoneMatchMode === 'specific') {
+          const targetPhone = state.config.after_hours_target_phone;
+          if (targetPhone) {
+            const normalizedTarget = normalizePhoneNumber(targetPhone);
+            if (normalizedPhone !== normalizedTarget) {
+              // Skip this phone - doesn't match target
+              continue;
+            }
+          }
+        }
 
         // Get flag colors and settings
         const flagBgColor = state.config.after_hours_flag_bg || '#ffc107';
@@ -865,6 +924,8 @@
         startTime: state.config.after_hours_start,
         endTime: state.config.after_hours_end,
         allowCallOnMobile: state.config.after_hours_allow_call,
+        phoneMatchMode: state.config.after_hours_phone_match_mode || 'all',
+        targetPhone: state.config.after_hours_target_phone || 'none',
         forceActive: state.forceActive,
         forceMobile: state.forceMobile,
         testModeActive: state.forceActive || state.forceMobile
