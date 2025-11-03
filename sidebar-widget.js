@@ -22,6 +22,19 @@
     canonicalPageUrl: null
   };
 
+  function getContrastColor(hexColor) {
+    // Convert hex to RGB
+    const r = parseInt(hexColor.substr(1, 2), 16);
+    const g = parseInt(hexColor.substr(3, 2), 16);
+    const b = parseInt(hexColor.substr(5, 2), 16);
+
+    // Calculate luminance (perceived brightness)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+    // Return black or white based on luminance
+    return luminance > 0.5 ? '#000000' : '#FFFFFF';
+  }
+
   function checkDomainMatch(allowedDomain) {
     // If no domain specified, allow all (backward compatibility)
     if (!allowedDomain) {
@@ -592,10 +605,10 @@
   }
 
   function createSidebarHTML(variant, config) {
-    const buttonText = config.button_type === 'call' 
+    const buttonText = config.button_type === 'call'
       ? `📞 Call Now`
       : '📅 Book Online';
-    
+
     const buttonLink = config.button_type === 'call'
       ? `tel:${config.phone_number.replace(/\D/g, '')}`
       : config.booking_url;
@@ -606,6 +619,9 @@
 
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
     const sidebarIcon = config.sidebar_icon || '💬';
+    const textColor = config.sidebar_text_color || '#FFFFFF';
+    const buttonColor = config.sidebar_button_color || '#FFFFFF';
+    const buttonTextColor = getContrastColor(buttonColor);
 
     return `
       <div id="vertical-sidebar" style="
@@ -616,7 +632,7 @@
         width: 380px;
         height: 100vh;
         background: ${config.brand_color ? `linear-gradient(180deg, ${config.brand_color} 0%, ${adjustColor(config.brand_color, -20)} 100%)` : 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)'};
-        color: #ffffff;
+        color: ${textColor};
         box-shadow: ${(config.position === 'left') ? '4px' : '-4px'} 0 30px rgba(0, 0, 0, 0.4);
         z-index: 2147483000;
         font-family: ${fontFamily};
@@ -725,12 +741,12 @@
           </div>
           
           <div style="width: 100%;">
-            <a href="${buttonLink}" 
+            <a href="${buttonLink}"
                id="sidebar-cta-btn"
                style="
               display: block;
-              background: white;
-              color: ${config.brand_color || '#667eea'};
+              background: ${buttonColor};
+              color: ${buttonTextColor};
               padding: 20px 32px;
               border-radius: 12px;
               text-decoration: none;
