@@ -22,6 +22,19 @@
     forceMobile: storedForceMobile  // For testing
   };
 
+  function getContrastColor(hexColor) {
+    // Convert hex to RGB
+    const r = parseInt(hexColor.substr(1, 2), 16);
+    const g = parseInt(hexColor.substr(3, 2), 16);
+    const b = parseInt(hexColor.substr(5, 2), 16);
+
+    // Calculate luminance (perceived brightness)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+    // Return black or white based on luminance
+    return luminance > 0.5 ? '#000000' : '#FFFFFF';
+  }
+
   // Phone number regex patterns for detection
   const PHONE_PATTERNS = [
     /(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, // (555) 555-5555, 555-555-5555, etc.
@@ -183,6 +196,8 @@
   function createPopupHTML(config) {
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
     const brandColor = config.brand_color || '#667eea';
+    const buttonColor = config.after_hours_button_color || '#667eea';
+    const buttonTextColor = getContrastColor(buttonColor);
     const popupMessage = config.after_hours_message || "We're currently closed. Book online instead!";
     const allowCall = config.after_hours_allow_call !== false; // default true
     const popupIcon = config.after_hours_popup_icon || '🌙'; // Use custom icon or default to moon
@@ -261,8 +276,8 @@
              id="after-hours-book-btn"
              style="
             display: block;
-            background: ${brandColor};
-            color: white;
+            background: ${buttonColor};
+            color: ${buttonTextColor};
             padding: 16px 28px;
             border-radius: 8px;
             text-decoration: none;
