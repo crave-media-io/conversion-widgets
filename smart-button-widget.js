@@ -467,6 +467,7 @@
     const bgColor = config.banner_bg_color || '#ffffff';
     const buttonColor = state.sessionButtonColor;
     const buttonText = state.sessionButtonText;
+    const buttonTextColor = config.smart_button_text_color || '#FFFFFF';
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
     // Conditionally render headline section
@@ -543,7 +544,7 @@
            style="
           display: inline-block;
           background: ${buttonColor};
-          color: white;
+          color: ${buttonTextColor};
           padding: 16px 36px;
           border-radius: 8px;
           text-decoration: none;
