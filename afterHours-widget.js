@@ -576,11 +576,15 @@
         const flagTextColor = state.config.after_hours_flag_text || '#333';
         const flagIcon = state.config.after_hours_icon || '🌙';
         const flagPosition = state.config.after_hours_flag_position || 'above'; // 'above', 'left', 'right'
+        const afterHoursMode = state.config.after_hours_mode || 'block';
 
-        // Determine layout based on position
+        // Determine layout based on mode and position
         let replacement;
-        if (flagPosition === 'above') {
-          replacement = `<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px; vertical-align: middle;" data-after-hours-processed="true">
+
+        if (afterHoursMode === 'flag_only') {
+          // Flag-only mode: Keep phone number functional, just add flag
+          if (flagPosition === 'above') {
+            replacement = `<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px; vertical-align: middle;" data-after-hours-processed="true">
   <span style="display: inline-block;
                padding: 3px 10px;
                background: ${flagBgColor};
@@ -592,22 +596,30 @@
                line-height: 1.2;">
     ${flagIcon} ${afterHoursLabel}
   </span>
-  <a href="${state.config.booking_url || '#'}"
-     style="color: ${state.config.brand_color || '#667eea'};
-            font-weight: 600;
-            font-size: 14px;
-            text-decoration: none;
-            border-bottom: 2px solid ${state.config.brand_color || '#667eea'};
-            line-height: 1.2;"
-     data-after-hours-book="true"
-     onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('phone_replacement_clicked')">
-    ${bookingText}
-  </a>
+  <span style="display: inline-block; line-height: 1.2;">${phoneText}</span>
 </span>`;
+          } else {
+            // Left or right position (horizontal layout)
+            const flexDirection = flagPosition === 'left' ? 'row' : 'row-reverse';
+            replacement = `<span style="display: inline-flex; flex-direction: ${flexDirection}; align-items: center; gap: 8px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <span style="display: inline-block; line-height: 1.2;">${phoneText}</span>
+</span>`;
+          }
         } else {
-          // Left or right position (horizontal layout)
-          const flexDirection = flagPosition === 'left' ? 'row' : 'row-reverse';
-          replacement = `<span style="display: inline-flex; flex-direction: ${flexDirection}; align-items: center; gap: 8px; vertical-align: middle;" data-after-hours-processed="true">
+          // Block mode: Replace phone with booking link (current default behavior)
+          if (flagPosition === 'above') {
+            replacement = `<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px; vertical-align: middle;" data-after-hours-processed="true">
   <span style="display: inline-block;
                padding: 3px 10px;
                background: ${flagBgColor};
@@ -631,6 +643,34 @@
     ${bookingText}
   </a>
 </span>`;
+          } else {
+            // Left or right position (horizontal layout)
+            const flexDirection = flagPosition === 'left' ? 'row' : 'row-reverse';
+            replacement = `<span style="display: inline-flex; flex-direction: ${flexDirection}; align-items: center; gap: 8px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <a href="${state.config.booking_url || '#'}"
+     style="color: ${state.config.brand_color || '#667eea'};
+            font-weight: 600;
+            font-size: 14px;
+            text-decoration: none;
+            border-bottom: 2px solid ${state.config.brand_color || '#667eea'};
+            line-height: 1.2;"
+     data-after-hours-book="true"
+     onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('phone_replacement_clicked')">
+    ${bookingText}
+  </a>
+</span>`;
+          }
         }
 
         // Replace in the modified text
@@ -705,11 +745,49 @@
     const flagTextColor = state.config.after_hours_flag_text || '#333';
     const flagIcon = state.config.after_hours_icon || '🌙';
     const flagPosition = state.config.after_hours_flag_position || 'above';
+    const afterHoursMode = state.config.after_hours_mode || 'block';
 
-    // Create replacement HTML template
+    // Create replacement HTML template based on mode
     let replacementTemplate;
-    if (flagPosition === 'above') {
-      replacementTemplate = `<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px; vertical-align: middle;" data-after-hours-processed="true">
+
+    if (afterHoursMode === 'flag_only') {
+      // Flag-only mode: Keep vanity number functional, just add flag
+      if (flagPosition === 'above') {
+        replacementTemplate = `<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <span style="display: inline-block; line-height: 1.2;">VANITY_NUMBER</span>
+</span>`;
+      } else {
+        const flexDirection = flagPosition === 'left' ? 'row' : 'row-reverse';
+        replacementTemplate = `<span style="display: inline-flex; flex-direction: ${flexDirection}; align-items: center; gap: 8px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <span style="display: inline-block; line-height: 1.2;">VANITY_NUMBER</span>
+</span>`;
+      }
+    } else {
+      // Block mode: Replace vanity number with booking link
+      if (flagPosition === 'above') {
+        replacementTemplate = `<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px; vertical-align: middle;" data-after-hours-processed="true">
   <span style="display: inline-block;
                padding: 3px 10px;
                background: ${flagBgColor};
@@ -733,9 +811,9 @@
     ${bookingText}
   </a>
 </span>`;
-    } else {
-      const flexDirection = flagPosition === 'left' ? 'row' : 'row-reverse';
-      replacementTemplate = `<span style="display: inline-flex; flex-direction: ${flexDirection}; align-items: center; gap: 8px; vertical-align: middle;" data-after-hours-processed="true">
+      } else {
+        const flexDirection = flagPosition === 'left' ? 'row' : 'row-reverse';
+        replacementTemplate = `<span style="display: inline-flex; flex-direction: ${flexDirection}; align-items: center; gap: 8px; vertical-align: middle;" data-after-hours-processed="true">
   <span style="display: inline-block;
                padding: 3px 10px;
                background: ${flagBgColor};
@@ -772,7 +850,9 @@
         const vanityRegex = new RegExp(escapedVanity, 'g');
 
         if (vanityRegex.test(modifiedText)) {
-          modifiedText = modifiedText.replace(vanityRegex, replacementTemplate);
+          // Replace VANITY_NUMBER placeholder with actual vanity number
+          const finalReplacement = replacementTemplate.replace('VANITY_NUMBER', vanity);
+          modifiedText = modifiedText.replace(vanityRegex, finalReplacement);
           hasReplacements = true;
           replacementCount++;
         }
