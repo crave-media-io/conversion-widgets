@@ -621,7 +621,7 @@
     const sidebarIcon = config.sidebar_icon || '💬';
     const textColor = config.sidebar_text_color || '#FFFFFF';
     const buttonColor = config.sidebar_button_color || '#FFFFFF';
-    const buttonTextColor = getContrastColor(buttonColor);
+    const buttonTextColor = config.sidebar_button_text_color || '#000000';
 
     return `
       <div id="vertical-sidebar" style="
