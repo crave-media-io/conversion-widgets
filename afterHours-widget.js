@@ -837,6 +837,7 @@
     ${bookingText}
   </a>
 </span>`;
+      }
     }
 
     nodesToReplace.forEach(textNode => {
@@ -846,7 +847,7 @@
 
       // Replace each vanity number found in the text
       vanityNumbers.forEach(vanity => {
-        const escapedVanity = vanity.replace(/[.*+?^${}()|\\[\]]/g, '\\$&');
+        const escapedVanity = vanity.replace(/[.*+?^${}()|\\\[\]]/g, '\\$&');
         const vanityRegex = new RegExp(escapedVanity, 'g');
 
         if (vanityRegex.test(modifiedText)) {
