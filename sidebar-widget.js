@@ -174,7 +174,8 @@
           headers: {
             'apikey': SUPABASE.key,
             'Authorization': `Bearer ${SUPABASE.key}`
-          }
+          },
+          cache: 'no-store'
         }
       );
 
@@ -189,7 +190,8 @@
             headers: {
               'apikey': SUPABASE.key,
               'Authorization': `Bearer ${SUPABASE.key}`
-            }
+            },
+            cache: 'no-store'
           }
         );
 
