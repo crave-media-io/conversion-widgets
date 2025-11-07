@@ -202,6 +202,11 @@
     const allowCall = config.after_hours_allow_call !== false; // default true
     const popupIcon = config.after_hours_popup_icon || '🌙'; // Use custom icon or default to moon
 
+    // Determine if branding should be shown based on plan
+    const plan = (config.subscription_plan || 'starter').toLowerCase();
+    const status = (config.subscription_status || 'trial').toLowerCase();
+    const showBranding = (plan === 'starter' || status === 'trial');
+
     return `
       <div id="after-hours-overlay" style="
         position: fixed;
@@ -319,7 +324,7 @@
             </button>
           `}
 
-          ${config.show_branding !== false ? `
+          ${showBranding ? `
           <div style="
             margin-top: 20px;
             padding-top: 16px;
