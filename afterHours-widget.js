@@ -197,7 +197,7 @@
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
     const brandColor = config.brand_color || '#667eea';
     const buttonColor = config.after_hours_button_color || '#667eea';
-    const buttonTextColor = getContrastColor(buttonColor);
+    const buttonTextColor = config.after_hours_button_text_color || '#FFFFFF';
     const popupMessage = config.after_hours_message || "We're currently closed. Book online instead!";
     const allowCall = config.after_hours_allow_call !== false; // default true
     const popupIcon = config.after_hours_popup_icon || '🌙'; // Use custom icon or default to moon
