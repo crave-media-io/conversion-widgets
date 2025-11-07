@@ -470,6 +470,11 @@
     const buttonTextColor = config.smart_button_text_color || '#FFFFFF';
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
+    // Determine if branding should be shown based on plan
+    const plan = (config.subscription_plan || 'starter').toLowerCase();
+    const status = (config.subscription_status || 'trial').toLowerCase();
+    const showBranding = (plan === 'starter' || status === 'trial');
+
     // Conditionally render headline section
     const headlineSection = state.headlinesEnabled ? `
       <h2 id="smart-button-headline" style="
@@ -516,26 +521,10 @@
               font-size: 15px !important;
             }
             #smart-button-branding {
-              position: static !important;
               margin-top: 15px !important;
             }
           }
         </style>
-
-        ${config.show_branding !== false ? `
-        <div id="smart-button-branding" style="
-          position: absolute;
-          top: 8px;
-          right: 12px;
-          font-size: 9px;
-          opacity: 0.4;
-          font-family: inherit;
-        ">
-          <a href="https://cravemedia.io" target="_blank" rel="noopener noreferrer" style="color: #666; text-decoration: none;">
-            Powered by cravemedia.io
-          </a>
-        </div>
-        ` : ''}
 
         ${headlineSection}
 
@@ -557,6 +546,20 @@
            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px ${buttonColor}40'">
           ${buttonText}
         </a>
+
+        ${showBranding ? `
+        <div id="smart-button-branding" style="
+          margin-top: 12px;
+          font-size: 10px;
+          opacity: 0.5;
+          font-family: inherit;
+          text-align: center;
+        ">
+          <a href="https://cravemedia.io" target="_blank" rel="noopener noreferrer" style="color: #666; text-decoration: none;">
+            Powered by cravemedia.io
+          </a>
+        </div>
+        ` : ''}
       </div>
     `;
   }
