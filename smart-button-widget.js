@@ -470,10 +470,9 @@
     const buttonTextColor = config.smart_button_text_color || '#FFFFFF';
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
-    // Determine if branding should be shown based on plan
-    const plan = (config.subscription_plan || 'starter').toLowerCase();
-    const status = (config.subscription_status || 'trial').toLowerCase();
-    const showBranding = (plan === 'starter' || status === 'trial');
+    // Use show_branding from database config (set based on subscription plan)
+    // Pro, Premium, and Unlimited plans have show_branding=false
+    const showBranding = config.show_branding !== false;
 
     // Conditionally render headline section
     const headlineSection = state.headlinesEnabled ? `
