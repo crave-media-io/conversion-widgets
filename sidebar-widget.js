@@ -321,15 +321,13 @@
         sessionStorage.setItem(cacheKey, JSON.stringify(data[0].headlines));
         return data[0].headlines;
       } else {
-        console.log('📝 No page-specific headlines, using defaults');
-        state.canonicalPageUrl = currentPath;
-        return config.headlines || getDefaultHeadlines();
+        console.log('⛔ No page-specific headlines found - sidebar will not show');
+        return null;
       }
     } catch (error) {
       console.error('❌ Error loading headlines:', error);
-      console.log('📝 Falling back to default headlines');
-      state.canonicalPageUrl = currentPath;
-      return config.headlines || getDefaultHeadlines();
+      console.log('⛔ Sidebar will not show due to error');
+      return null;
     }
   }
 
