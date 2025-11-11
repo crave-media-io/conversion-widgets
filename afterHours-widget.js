@@ -582,6 +582,11 @@
         const flagPosition = state.config.after_hours_flag_position || 'above'; // 'above', 'left', 'right'
         const afterHoursMode = state.config.after_hours_mode || 'block';
 
+        // Mobile-only mode: Skip desktop phone replacement entirely
+        if (afterHoursMode === 'mobile_only') {
+          continue; // Skip this phone number on desktop
+        }
+
         // Determine layout based on mode and position
         let replacement;
 
