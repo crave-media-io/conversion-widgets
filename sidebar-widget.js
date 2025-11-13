@@ -605,9 +605,8 @@
   }
 
   function createSidebarHTML(variant, config) {
-    const buttonText = config.button_type === 'call'
-      ? `📞 Call Now`
-      : '📅 Book Online';
+    const buttonText = config.sidebar_button_text ||
+      (config.button_type === 'call' ? `📞 Call Now` : '📅 Book Online');
 
     const buttonLink = config.button_type === 'call'
       ? `tel:${config.phone_number.replace(/\D/g, '')}`
