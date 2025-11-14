@@ -152,7 +152,10 @@
       if (data && data.length > 0) {
         const config = data[0];
         console.log('✅ After-hours config loaded:', config.business_name);
-        console.log('🎨 Desktop Link Color:', config.after_hours_desktop_link_color || 'NOT SET (will use default #667eea)');
+        console.log('🎨 Color Debug Info:');
+        console.log('   - Sidebar Panel Color (brand_color):', config.brand_color || 'NOT SET');
+        console.log('   - Desktop Link Color (after_hours_desktop_link_color):', config.after_hours_desktop_link_color || 'NOT SET (will use default #667eea)');
+        console.log('   - Are they different?', config.brand_color !== config.after_hours_desktop_link_color ? '✅ YES' : '❌ NO (same value)');
         return config;
       } else {
         console.error('❌ No config found for client:', CLIENT_ID);
@@ -641,11 +644,11 @@
     ${flagIcon} ${afterHoursLabel}
   </span>
   <a href="${state.config.booking_url || '#'}"
-     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'};
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             font-weight: 600;
             font-size: 14px;
             text-decoration: none;
-            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'};
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             line-height: 1.2;"
      data-after-hours-book="true"
      onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('phone_replacement_clicked')">
@@ -668,11 +671,11 @@
     ${flagIcon} ${afterHoursLabel}
   </span>
   <a href="${state.config.booking_url || '#'}"
-     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'};
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             font-weight: 600;
             font-size: 14px;
             text-decoration: none;
-            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'};
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             line-height: 1.2;"
      data-after-hours-book="true"
      onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('phone_replacement_clicked')">
@@ -713,6 +716,9 @@
 
   function replaceVanityNumbers(vanityNumbers) {
     console.log('🔍 Scanning page for vanity numbers...');
+    console.log('🎨 Vanity Link Color Check:');
+    console.log('   - Will use color:', state.config.after_hours_desktop_link_color || '#667eea');
+    console.log('   - Sidebar panel color is:', state.config.brand_color);
 
     const treeWalker = document.createTreeWalker(
       document.body,
@@ -809,11 +815,11 @@
     ${flagIcon} ${afterHoursLabel}
   </span>
   <a href="${state.config.booking_url || '#'}"
-     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'};
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             font-weight: 600;
             font-size: 14px;
             text-decoration: none;
-            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'};
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             line-height: 1.2;"
      data-after-hours-book="true"
      onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('vanity_replacement_clicked')">
@@ -835,11 +841,11 @@
     ${flagIcon} ${afterHoursLabel}
   </span>
   <a href="${state.config.booking_url || '#'}"
-     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'};
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             font-weight: 600;
             font-size: 14px;
             text-decoration: none;
-            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'};
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             line-height: 1.2;"
      data-after-hours-book="true"
      onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('vanity_replacement_clicked')">
@@ -911,9 +917,12 @@
   // Expose tracking function globally for inline onclick handlers
   window.afterHoursTrackEvent = trackEvent;
 
+  // Expose state for debugging
+  window.afterHoursDebugState = state;
+
   async function init() {
     console.log('🚀 After-Hours Widget initializing...');
-    console.log('📦 Widget Version: Multi-Site + Enforcement');
+    console.log('📦 Widget Version: 2025-11-14 Vanity Color Debug');
     console.log('🆔 Client ID:', CLIENT_ID);
     console.log('📱 Device:', state.isMobile ? 'Mobile' : 'Desktop');
 
