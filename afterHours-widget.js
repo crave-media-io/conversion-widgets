@@ -808,11 +808,11 @@
     ${flagIcon} ${afterHoursLabel}
   </span>
   <a href="${state.config.booking_url || '#'}"
-     style="color: ${state.config.brand_color || '#667eea'};
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'};
             font-weight: 600;
             font-size: 14px;
             text-decoration: none;
-            border-bottom: 2px solid ${state.config.brand_color || '#667eea'};
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'};
             line-height: 1.2;"
      data-after-hours-book="true"
      onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('vanity_replacement_clicked')">
@@ -834,11 +834,11 @@
     ${flagIcon} ${afterHoursLabel}
   </span>
   <a href="${state.config.booking_url || '#'}"
-     style="color: ${state.config.brand_color || '#667eea'};
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'};
             font-weight: 600;
             font-size: 14px;
             text-decoration: none;
-            border-bottom: 2px solid ${state.config.brand_color || '#667eea'};
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'};
             line-height: 1.2;"
      data-after-hours-book="true"
      onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('vanity_replacement_clicked')">
