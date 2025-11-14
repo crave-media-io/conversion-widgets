@@ -152,6 +152,7 @@
       if (data && data.length > 0) {
         const config = data[0];
         console.log('✅ After-hours config loaded:', config.business_name);
+        console.log('🎨 Desktop Link Color:', config.after_hours_desktop_link_color || 'NOT SET (will use default #667eea)');
         return config;
       } else {
         console.error('❌ No config found for client:', CLIENT_ID);
