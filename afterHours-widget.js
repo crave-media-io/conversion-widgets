@@ -195,7 +195,6 @@
 
   function createPopupHTML(config) {
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-    const brandColor = config.brand_color || '#667eea';
     const buttonColor = config.after_hours_button_color || '#667eea';
     const buttonTextColor = config.after_hours_button_text_color || '#FFFFFF';
     const popupMessage = config.after_hours_message || "We're currently closed. Book online instead!";
@@ -641,11 +640,11 @@
     ${flagIcon} ${afterHoursLabel}
   </span>
   <a href="${state.config.booking_url || '#'}"
-     style="color: ${state.config.brand_color || '#667eea'};
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'};
             font-weight: 600;
             font-size: 14px;
             text-decoration: none;
-            border-bottom: 2px solid ${state.config.brand_color || '#667eea'};
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'};
             line-height: 1.2;"
      data-after-hours-book="true"
      onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('phone_replacement_clicked')">
@@ -668,11 +667,11 @@
     ${flagIcon} ${afterHoursLabel}
   </span>
   <a href="${state.config.booking_url || '#'}"
-     style="color: ${state.config.brand_color || '#667eea'};
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'};
             font-weight: 600;
             font-size: 14px;
             text-decoration: none;
-            border-bottom: 2px solid ${state.config.brand_color || '#667eea'};
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'};
             line-height: 1.2;"
      data-after-hours-book="true"
      onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('phone_replacement_clicked')">
