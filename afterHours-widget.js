@@ -1045,7 +1045,7 @@
 
   async function init() {
     console.log('🚀 After-Hours Widget initializing...');
-    console.log('📦 Widget Version: 2025-11-14 Vanity Color Debug');
+    console.log('📦 Widget Version: 2025-11-15 Auto-Contrast Debug');
     console.log('🆔 Client ID:', CLIENT_ID);
     console.log('📱 Device:', state.isMobile ? 'Mobile' : 'Desktop');
 
@@ -1201,3 +1201,4 @@
     init();
   }
 })();
+
