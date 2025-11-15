@@ -807,8 +807,9 @@
           const bookingLinks = span.querySelectorAll('a[data-after-hours-book]');
           bookingLinks.forEach(link => {
             const adjustedColor = getDesktopLinkColor(link.parentElement);
-            link.style.color = adjustedColor + ' !important';
-            link.style.borderBottomColor = adjustedColor + ' !important';
+            // Use setProperty to properly override !important styles
+            link.style.setProperty('color', adjustedColor, 'important');
+            link.style.setProperty('border-bottom-color', adjustedColor, 'important');
           });
         }
       }
@@ -998,8 +999,9 @@
           const bookingLinks = span.querySelectorAll('a[data-after-hours-book]');
           bookingLinks.forEach(link => {
             const adjustedColor = getDesktopLinkColor(link.parentElement);
-            link.style.color = adjustedColor + ' !important';
-            link.style.borderBottomColor = adjustedColor + ' !important';
+            // Use setProperty to properly override !important styles
+            link.style.setProperty('color', adjustedColor, 'important');
+            link.style.setProperty('border-bottom-color', adjustedColor, 'important');
           });
         }
       }
@@ -1045,7 +1047,7 @@
 
   async function init() {
     console.log('🚀 After-Hours Widget initializing...');
-    console.log('📦 Widget Version: 2025-11-15 Auto-Contrast Debug');
+    console.log('📦 Widget Version: 2025-11-14 Vanity Color Debug');
     console.log('🆔 Client ID:', CLIENT_ID);
     console.log('📱 Device:', state.isMobile ? 'Mobile' : 'Desktop');
 
@@ -1201,4 +1203,3 @@
     init();
   }
 })();
-
