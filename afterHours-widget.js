@@ -35,6 +35,109 @@
     return luminance > 0.5 ? '#000000' : '#FFFFFF';
   }
 
+  // WCAG 2.1 AA compliant contrast ratio calculator
+  function getRelativeLuminance(r, g, b) {
+    // Normalize RGB values to 0-1
+    const rsRGB = r / 255;
+    const gsRGB = g / 255;
+    const bsRGB = b / 255;
+
+    // Apply gamma correction
+    const rLinear = rsRGB <= 0.03928 ? rsRGB / 12.92 : Math.pow((rsRGB + 0.055) / 1.055, 2.4);
+    const gLinear = gsRGB <= 0.03928 ? gsRGB / 12.92 : Math.pow((gsRGB + 0.055) / 1.055, 2.4);
+    const bLinear = bsRGB <= 0.03928 ? bsRGB / 12.92 : Math.pow((bsRGB + 0.055) / 1.055, 2.4);
+
+    // Calculate relative luminance
+    return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+  }
+
+  function hexToRGB(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : { r: 0, g: 0, b: 0 };
+  }
+
+  function getContrastRatio(color1, color2) {
+    const rgb1 = hexToRGB(color1);
+    const rgb2 = hexToRGB(color2);
+
+    const lum1 = getRelativeLuminance(rgb1.r, rgb1.g, rgb1.b);
+    const lum2 = getRelativeLuminance(rgb2.r, rgb2.g, rgb2.b);
+
+    const lighter = Math.max(lum1, lum2);
+    const darker = Math.min(lum1, lum2);
+
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  function getAccessibleColor(textColor, backgroundColor) {
+    // WCAG AA requires 4.5:1 contrast ratio for normal text
+    const MIN_CONTRAST = 4.5;
+
+    const currentContrast = getContrastRatio(textColor, backgroundColor);
+
+    // If contrast is already good, return original color
+    if (currentContrast >= MIN_CONTRAST) {
+      return textColor;
+    }
+
+    // Try white or black as alternatives
+    const whiteContrast = getContrastRatio('#FFFFFF', backgroundColor);
+    const blackContrast = getContrastRatio('#000000', backgroundColor);
+
+    // Return whichever has better contrast
+    if (whiteContrast >= blackContrast) {
+      return '#FFFFFF';
+    } else {
+      return '#000000';
+    }
+  }
+
+  // Helper function to get the effective background color of an element
+  function getEffectiveBackgroundColor(element) {
+    let el = element;
+    while (el && el !== document.body) {
+      const bg = window.getComputedStyle(el).backgroundColor;
+      // Check if background is not transparent
+      if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+        // Convert rgb() to hex
+        const rgb = bg.match(/\d+/g);
+        if (rgb && rgb.length >= 3) {
+          const toHex = (n) => {
+            const hex = parseInt(n).toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+          };
+          return '#' + toHex(rgb[0]) + toHex(rgb[1]) + toHex(rgb[2]);
+        }
+        return bg;
+      }
+      el = el.parentElement;
+    }
+    // Default to white if no background found
+    return '#FFFFFF';
+  }
+
+  // Helper function to get the appropriate link color (with auto-contrast if enabled)
+  function getDesktopLinkColor(parentElement) {
+    const baseColor = state.config.after_hours_desktop_link_color || '#667eea';
+    const autoContrast = state.config.after_hours_auto_contrast || false;
+
+    if (!autoContrast) {
+      return baseColor;
+    }
+
+    // Auto-contrast is enabled - detect background and adjust if needed
+    const bgColor = getEffectiveBackgroundColor(parentElement);
+    const adjustedColor = getAccessibleColor(baseColor, bgColor);
+
+    console.log(`🎨 Auto-contrast: bg=${bgColor}, base=${baseColor}, adjusted=${adjustedColor}`);
+
+    return adjustedColor;
+  }
+
   // Phone number regex patterns for detection
   const PHONE_PATTERNS = [
     /(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, // (555) 555-5555, 555-555-5555, etc.
@@ -698,6 +801,16 @@
         span.innerHTML = modifiedText;
         span.setAttribute('data-after-hours-processed', 'true');
         textNode.parentElement.replaceChild(span, textNode);
+
+        // Apply auto-contrast if enabled
+        if (state.config.after_hours_auto_contrast) {
+          const bookingLinks = span.querySelectorAll('a[data-after-hours-book]');
+          bookingLinks.forEach(link => {
+            const adjustedColor = getDesktopLinkColor(link.parentElement);
+            link.style.color = adjustedColor + ' !important';
+            link.style.borderBottomColor = adjustedColor + ' !important';
+          });
+        }
       }
     });
 
@@ -879,6 +992,16 @@
         span.innerHTML = modifiedText;
         span.setAttribute('data-after-hours-processed', 'true');
         textNode.parentElement.replaceChild(span, textNode);
+
+        // Apply auto-contrast if enabled
+        if (state.config.after_hours_auto_contrast) {
+          const bookingLinks = span.querySelectorAll('a[data-after-hours-book]');
+          bookingLinks.forEach(link => {
+            const adjustedColor = getDesktopLinkColor(link.parentElement);
+            link.style.color = adjustedColor + ' !important';
+            link.style.borderBottomColor = adjustedColor + ' !important';
+          });
+        }
       }
     });
 
