@@ -665,6 +665,9 @@
             #vertical-sidebar {
               width: 85vw !important;
             }
+            #sidebar-phone-number {
+              display: none !important;
+            }
           }
           @media (max-width: 480px) {
             #vertical-sidebar {
@@ -762,7 +765,7 @@
             </a>
             
             ${config.button_type === 'call' ? `
-              <p style="
+              <p id="sidebar-phone-number" style="
                 text-align: center;
                 font-size: 22px;
                 font-weight: 600;
@@ -912,7 +915,7 @@
 
   async function init() {
     console.log('🚀 AI-Powered Sidebar initializing...');
-    console.log('📦 Widget Version: v50.4 - Multi-Site + Enforcement');
+    console.log('📦 Widget Version: v50.5 - Hide Phone on Mobile (Call Button)');
     console.log('🆔 Client ID:', CLIENT_ID);
 
     if (window.TEST_PATH) {
