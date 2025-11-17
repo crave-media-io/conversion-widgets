@@ -275,19 +275,67 @@
       return false;
     }
 
-    // Get current time in client's timezone
+    // Get current time and day in client's timezone
     const now = new Date();
+    const timezone = config.after_hours_timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
     const localTime = now.toLocaleTimeString('en-US', {
       hour12: false,
-      timeZone: config.after_hours_timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+      timeZone: timezone
     });
 
+    // Get day of week (0 = Sunday, 6 = Saturday)
+    const dayOfWeek = parseInt(now.toLocaleString('en-US', {
+      weekday: 'numeric',
+      timeZone: timezone
+    }));
+
+    const isSaturday = dayOfWeek === 6;
+    const isSunday = dayOfWeek === 0;
+    const isWeekend = isSaturday || isSunday;
+
+    // Check if closed on weekends
+    if (isWeekend && config.after_hours_closed_weekends) {
+      console.log('📅 Weekend detected - business closed all day');
+      return true; // Widget active all day on weekends
+    }
+
+    // Get current time in minutes
     const [hours, minutes] = localTime.split(':').map(Number);
     const currentMinutes = hours * 60 + minutes;
 
+    // Determine which schedule to use
+    let startTime, endTime;
+
+    if (isSaturday && config.after_hours_saturday_start) {
+      // Custom Saturday hours
+      if (!config.after_hours_saturday_enabled) {
+        console.log('📅 Saturday - business closed all day');
+        return true; // Closed all day Saturday
+      }
+      startTime = config.after_hours_saturday_start || '09:00';
+      endTime = config.after_hours_saturday_end || '17:00';
+      console.log('📅 Using custom Saturday hours:', startTime, '-', endTime);
+    } else if (isSunday && config.after_hours_sunday_start) {
+      // Custom Sunday hours
+      if (!config.after_hours_sunday_enabled) {
+        console.log('📅 Sunday - business closed all day');
+        return true; // Closed all day Sunday
+      }
+      startTime = config.after_hours_sunday_start || '09:00';
+      endTime = config.after_hours_sunday_end || '17:00';
+      console.log('📅 Using custom Sunday hours:', startTime, '-', endTime);
+    } else {
+      // Default weekday hours (or weekend if no custom schedule)
+      startTime = config.after_hours_start || '17:00';
+      endTime = config.after_hours_end || '09:00';
+      const dayName = isWeekend ? (isSaturday ? 'Saturday' : 'Sunday') : 'weekday';
+      console.log('📅 Using default weekday hours for', dayName + ':', startTime, '-', endTime);
+    }
+
     // Parse start and end times
-    const [startHour, startMin] = (config.after_hours_start || '17:00').split(':').map(Number);
-    const [endHour, endMin] = (config.after_hours_end || '09:00').split(':').map(Number);
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
 
     const startMinutes = startHour * 60 + startMin;
     const endMinutes = endHour * 60 + endMin;
@@ -1047,7 +1095,7 @@
 
   async function init() {
     console.log('🚀 After-Hours Widget initializing...');
-    console.log('📦 Widget Version: 2025-11-14 Vanity Color Debug');
+    console.log('📦 Widget Version: 2025-11-17 Weekend Schedule Support');
     console.log('🆔 Client ID:', CLIENT_ID);
     console.log('📱 Device:', state.isMobile ? 'Mobile' : 'Desktop');
 
