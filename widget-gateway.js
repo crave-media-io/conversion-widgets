@@ -1,5 +1,5 @@
 /**
- * Widget Gateway Script v1.0
+ * Widget Gateway Script v1.1
  *
  * This is the ONLY script clients need to install.
  * It handles:
@@ -8,7 +8,10 @@
  * - Dynamic widget loading
  * - Suspension warnings
  *
- * Usage:
+ * Usage (Recommended - works with GTM):
+ * <script src="https://cdn.jsdelivr.net/gh/crave-media-io/conversion-widgets@main/widget-gateway.js?client-id=YOUR_CLIENT_ID"></script>
+ *
+ * Legacy Usage (still supported):
  * <script src="https://cdn.jsdelivr.net/gh/crave-media-io/conversion-widgets@main/widget-gateway.js"
  *         data-client-id="YOUR_CLIENT_ID"></script>
  */
@@ -26,12 +29,48 @@
         after_hours: 'https://cdn.jsdelivr.net/gh/crave-media-io/conversion-widgets@main/afterHours-widget.js'
     };
 
-    // Get client ID from script tag
-    const scriptTag = document.currentScript || document.querySelector('script[data-client-id]');
-    const clientId = scriptTag ? scriptTag.getAttribute('data-client-id') : null;
+    /**
+     * Get client ID with multiple fallback methods for maximum compatibility
+     * Priority: URL parameter > data attribute > global variable
+     */
+    function getClientId() {
+        // Method 1: URL parameter (recommended - works everywhere including GTM)
+        const scripts = document.getElementsByTagName('script');
+        for (let i = 0; i < scripts.length; i++) {
+            const src = scripts[i].src;
+            if (src && src.includes('widget-gateway.js')) {
+                const url = new URL(src);
+                const clientId = url.searchParams.get('client-id');
+                if (clientId) {
+                    console.log('[Widget Gateway] Client ID found in URL parameter');
+                    return clientId;
+                }
+            }
+        }
+
+        // Method 2: data-client-id attribute (legacy support)
+        const scriptTag = document.currentScript || document.querySelector('script[data-client-id]');
+        if (scriptTag) {
+            const clientId = scriptTag.getAttribute('data-client-id');
+            if (clientId) {
+                console.log('[Widget Gateway] Client ID found in data attribute (legacy method)');
+                return clientId;
+            }
+        }
+
+        // Method 3: Global variable (GTM workaround - kept for backwards compatibility)
+        if (window.CONVERSION_WIDGET_CLIENT_ID) {
+            console.log('[Widget Gateway] Client ID found in global variable');
+            return window.CONVERSION_WIDGET_CLIENT_ID;
+        }
+
+        return null;
+    }
+
+    const clientId = getClientId();
 
     if (!clientId) {
-        console.error('[Widget Gateway] Error: No client ID provided. Add data-client-id="YOUR_ID" to the script tag.');
+        console.error('[Widget Gateway] Error: No client ID provided. Add ?client-id=YOUR_ID to the script URL.');
         return;
     }
 
