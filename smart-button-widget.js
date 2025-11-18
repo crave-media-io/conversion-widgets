@@ -459,9 +459,18 @@
   // CREATE SMART BUTTON HTML
   // ============================================
   function createSmartButtonHTML(variant, config) {
-    const buttonLink = config.button_type === 'call'
-      ? `tel:${config.phone_number.replace(/\D/g, '')}`
-      : config.booking_url;
+    // Determine button link with custom URL override
+    let buttonLink;
+    if (config.smart_button_use_custom_url && config.smart_button_custom_url && config.smart_button_custom_url.trim()) {
+      // Use custom URL if enabled and provided
+      buttonLink = config.smart_button_custom_url;
+      console.log('🔗 Using custom URL for smart button:', buttonLink);
+    } else {
+      // Fall back to default behavior
+      buttonLink = config.button_type === 'call'
+        ? `tel:${config.phone_number.replace(/\D/g, '')}`
+        : config.booking_url;
+    }
 
     const borderColor = config.banner_border_color || config.brand_color || '#667eea';
     const bgColor = config.banner_bg_color || '#ffffff';
