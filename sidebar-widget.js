@@ -612,7 +612,12 @@
     let buttonLink;
     if (config.sidebar_use_custom_url && config.sidebar_custom_url && config.sidebar_custom_url.trim()) {
       // Use custom URL if enabled and provided
-      buttonLink = config.sidebar_custom_url;
+      let customUrl = config.sidebar_custom_url.trim();
+      // Ensure URL has protocol to prevent relative path issues
+      if (!customUrl.match(/^https?:\/\//i) && !customUrl.startsWith('tel:') && !customUrl.startsWith('mailto:')) {
+        customUrl = 'https://' + customUrl;
+      }
+      buttonLink = customUrl;
       console.log('🔗 Using custom URL for sidebar:', buttonLink);
     } else {
       // Fall back to default behavior
