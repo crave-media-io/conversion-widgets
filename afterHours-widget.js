@@ -384,7 +384,7 @@
         right: 0;
         bottom: 0;
         background: rgba(0, 0, 0, 0.7);
-        z-index: 2147483646;
+        z-index: 2147483647;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -953,6 +953,22 @@
     const flagPosition = state.config.after_hours_flag_position || 'above';
     const afterHoursMode = state.config.after_hours_mode || 'block';
 
+    // Determine booking URL with custom URL override
+    let bookingUrl;
+    if (state.config.after_hours_use_custom_url && state.config.after_hours_custom_url && state.config.after_hours_custom_url.trim()) {
+      // Use custom URL if enabled and provided
+      let customUrl = state.config.after_hours_custom_url.trim();
+      // Add protocol if missing
+      if (!customUrl.match(/^https?:\/\//i) && !customUrl.startsWith('tel:') && !customUrl.startsWith('mailto:')) {
+        customUrl = 'https://' + customUrl;
+      }
+      bookingUrl = customUrl;
+      console.log('🔗 Using custom URL for vanity numbers:', bookingUrl);
+    } else {
+      // Fall back to default booking URL
+      bookingUrl = state.config.booking_url || '#';
+    }
+
     // Create replacement HTML template based on mode
     let replacementTemplate;
 
@@ -1056,7 +1072,7 @@
         const escapedVanity = vanity.replace(/[.*+?^${}()|\\\[\]]/g, '\\$&');
         const vanityRegex = new RegExp(escapedVanity, 'g');
 
-        if (vanityRegex.test(modifiedText)) {
+        if (modifiedText.indexOf(vanity) !== -1) {
           // Replace VANITY_NUMBER placeholder with actual vanity number
           const finalReplacement = replacementTemplate.replace('VANITY_NUMBER', vanity);
           modifiedText = modifiedText.replace(vanityRegex, finalReplacement);
