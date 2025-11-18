@@ -364,7 +364,12 @@
     let bookingUrl;
     if (config.after_hours_use_custom_url && config.after_hours_custom_url && config.after_hours_custom_url.trim()) {
       // Use custom URL if enabled and provided
-      bookingUrl = config.after_hours_custom_url;
+      let customUrl = config.after_hours_custom_url.trim();
+      // Ensure URL has protocol to prevent relative path issues
+      if (!customUrl.match(/^https?:\/\//i) && !customUrl.startsWith('tel:') && !customUrl.startsWith('mailto:')) {
+        customUrl = 'https://' + customUrl;
+      }
+      bookingUrl = customUrl;
       console.log('🔗 Using custom URL for after hours:', bookingUrl);
     } else {
       // Fall back to default booking URL
@@ -706,7 +711,12 @@
     // Determine booking URL with custom URL override
     let bookingUrl;
     if (state.config.after_hours_use_custom_url && state.config.after_hours_custom_url && state.config.after_hours_custom_url.trim()) {
-      bookingUrl = state.config.after_hours_custom_url;
+      let customUrl = state.config.after_hours_custom_url.trim();
+      // Ensure URL has protocol to prevent relative path issues
+      if (!customUrl.match(/^https?:\/\//i) && !customUrl.startsWith('tel:') && !customUrl.startsWith('mailto:')) {
+        customUrl = 'https://' + customUrl;
+      }
+      bookingUrl = customUrl;
     } else {
       bookingUrl = state.config.booking_url || '#';
     }
