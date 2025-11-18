@@ -463,7 +463,12 @@
     let buttonLink;
     if (config.smart_button_use_custom_url && config.smart_button_custom_url && config.smart_button_custom_url.trim()) {
       // Use custom URL if enabled and provided
-      buttonLink = config.smart_button_custom_url;
+      let customUrl = config.smart_button_custom_url.trim();
+      // Ensure URL has protocol to prevent relative path issues
+      if (!customUrl.match(/^https?:\/\//i) && !customUrl.startsWith('tel:') && !customUrl.startsWith('mailto:')) {
+        customUrl = 'https://' + customUrl;
+      }
+      buttonLink = customUrl;
       console.log('🔗 Using custom URL for smart button:', buttonLink);
     } else {
       // Fall back to default behavior
