@@ -360,6 +360,17 @@
     // Pro, Premium, and Unlimited plans have show_branding=false
     const showBranding = config.show_branding !== false;
 
+    // Determine booking URL with custom URL override
+    let bookingUrl;
+    if (config.after_hours_use_custom_url && config.after_hours_custom_url && config.after_hours_custom_url.trim()) {
+      // Use custom URL if enabled and provided
+      bookingUrl = config.after_hours_custom_url;
+      console.log('🔗 Using custom URL for after hours:', bookingUrl);
+    } else {
+      // Fall back to default booking URL
+      bookingUrl = config.booking_url || '#';
+    }
+
     return `
       <div id="after-hours-overlay" style="
         position: fixed;
@@ -430,7 +441,7 @@
             ${popupMessage}
           </p>
 
-          <a href="${config.booking_url || '#'}"
+          <a href="${bookingUrl}"
              id="after-hours-book-btn"
              style="
             display: block;
@@ -692,6 +703,14 @@
     const afterHoursLabel = state.config.after_hours_label || 'After Hours';
     const bookingText = state.config.after_hours_booking_text || 'Book Online';
 
+    // Determine booking URL with custom URL override
+    let bookingUrl;
+    if (state.config.after_hours_use_custom_url && state.config.after_hours_custom_url && state.config.after_hours_custom_url.trim()) {
+      bookingUrl = state.config.after_hours_custom_url;
+    } else {
+      bookingUrl = state.config.booking_url || '#';
+    }
+
     nodesToReplace.forEach(textNode => {
       const text = textNode.textContent;
       let modifiedText = text;
@@ -794,7 +813,7 @@
                line-height: 1.2;">
     ${flagIcon} ${afterHoursLabel}
   </span>
-  <a href="${state.config.booking_url || '#'}"
+  <a href="${bookingUrl}"
      style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             font-weight: 600;
             font-size: 14px;
@@ -821,7 +840,7 @@
                line-height: 1.2;">
     ${flagIcon} ${afterHoursLabel}
   </span>
-  <a href="${state.config.booking_url || '#'}"
+  <a href="${bookingUrl}"
      style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             font-weight: 600;
             font-size: 14px;
@@ -976,7 +995,7 @@
                line-height: 1.2;">
     ${flagIcon} ${afterHoursLabel}
   </span>
-  <a href="${state.config.booking_url || '#'}"
+  <a href="${bookingUrl}"
      style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             font-weight: 600;
             font-size: 14px;
@@ -1002,7 +1021,7 @@
                line-height: 1.2;">
     ${flagIcon} ${afterHoursLabel}
   </span>
-  <a href="${state.config.booking_url || '#'}"
+  <a href="${bookingUrl}"
      style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
             font-weight: 600;
             font-size: 14px;
