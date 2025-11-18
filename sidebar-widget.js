@@ -741,6 +741,7 @@
               font-weight: 700;
               line-height: 1.2;
               font-family: inherit;
+              color: ${textColor};
             ">
               ${variant.headline}
             </h2>
@@ -751,6 +752,7 @@
               line-height: 1.6;
               opacity: 0.95;
               font-family: inherit;
+              color: ${textColor};
             ">
               ${variant.message}
             </p>
@@ -786,6 +788,7 @@
                 margin: 0 0 40px 0;
                 opacity: 0.95;
                 font-family: inherit;
+                color: ${textColor};
               ">
                 ${config.phone_number}
               </p>
@@ -801,6 +804,7 @@
                 font-size: 12px;
                 opacity: 0.6;
                 font-family: inherit;
+                color: ${textColor};
               ">
                 ${config.business_name}
               </p>
