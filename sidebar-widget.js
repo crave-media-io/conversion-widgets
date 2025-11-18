@@ -608,9 +608,18 @@
     const buttonText = config.sidebar_button_text ||
       (config.button_type === 'call' ? `📞 Call Now` : '📅 Book Online');
 
-    const buttonLink = config.button_type === 'call'
-      ? `tel:${config.phone_number.replace(/\D/g, '')}`
-      : config.booking_url;
+    // Determine button link with custom URL override
+    let buttonLink;
+    if (config.sidebar_use_custom_url && config.sidebar_custom_url && config.sidebar_custom_url.trim()) {
+      // Use custom URL if enabled and provided
+      buttonLink = config.sidebar_custom_url;
+      console.log('🔗 Using custom URL for sidebar:', buttonLink);
+    } else {
+      // Fall back to default behavior
+      buttonLink = config.button_type === 'call'
+        ? `tel:${config.phone_number.replace(/\D/g, '')}`
+        : config.booking_url;
+    }
 
     const sidePosition = (config.position === 'left')
       ? `left: -380px; right: auto;`
