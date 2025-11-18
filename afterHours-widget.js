@@ -285,10 +285,10 @@
     });
 
     // Get day of week (0 = Sunday, 6 = Saturday)
-    const dayOfWeek = parseInt(now.toLocaleString('en-US', {
-      weekday: 'numeric',
+    // Convert to target timezone first, then get day of week
+    const dayOfWeek = new Date(now.toLocaleString('en-US', {
       timeZone: timezone
-    }));
+    })).getDay();
 
     const isSaturday = dayOfWeek === 6;
     const isSunday = dayOfWeek === 0;
