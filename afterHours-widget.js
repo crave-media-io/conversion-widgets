@@ -1,25 +1,25 @@
 (function() {
   'use strict';
-  
+
   const SUPABASE = {
     url: 'https://dnsbirpaknvifkgbodqd.supabase.co',
     key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuc2JpcnBha252aWZrZ2JvZHFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5MDI1MjUsImV4cCI6MjA3NTQ3ODUyNX0.0f_q15ZhmHI2gEpS53DyIeRnReF-KS4YYJ1PdetyYwQ'
   };
 
-  const VERCEL_API = 'https://conversion-widget-bvlot9viq-zacs-projects-da5d5e52.vercel.app';
-
-  const scriptTag = document.currentScript || document.querySelector('script[data-client-id][src*="sidebar-widget"]');
+  const scriptTag = document.currentScript || document.querySelector('script[data-client-id][src*="afterHours-widget"]');
   const CLIENT_ID = scriptTag ? scriptTag.getAttribute('data-client-id') : 'test_client_123';
+
+  // Check for stored test mode settings BEFORE defining state
+  const storedTestMode = sessionStorage.getItem('AFTER_HOURS_TEST_MODE');
+  const storedForceActive = sessionStorage.getItem('AFTER_HOURS_FORCE_ACTIVE') === 'true';
+  const storedForceMobile = sessionStorage.getItem('AFTER_HOURS_FORCE_MOBILE') === 'true';
 
   const state = {
     config: null,
-    currentVariant: null,
-    currentIndex: 0,
-    isDismissed: false,
-    rotationTimer: null,
-    isVisible: false,
-    headlines: null,
-    canonicalPageUrl: null
+    isAfterHours: false,
+    isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+    forceActive: storedForceActive, // For testing
+    forceMobile: storedForceMobile  // For testing
   };
 
   function getContrastColor(hexColor) {
@@ -34,6 +34,117 @@
     // Return black or white based on luminance
     return luminance > 0.5 ? '#000000' : '#FFFFFF';
   }
+
+  // WCAG 2.1 AA compliant contrast ratio calculator
+  function getRelativeLuminance(r, g, b) {
+    // Normalize RGB values to 0-1
+    const rsRGB = r / 255;
+    const gsRGB = g / 255;
+    const bsRGB = b / 255;
+
+    // Apply gamma correction
+    const rLinear = rsRGB <= 0.03928 ? rsRGB / 12.92 : Math.pow((rsRGB + 0.055) / 1.055, 2.4);
+    const gLinear = gsRGB <= 0.03928 ? gsRGB / 12.92 : Math.pow((gsRGB + 0.055) / 1.055, 2.4);
+    const bLinear = bsRGB <= 0.03928 ? bsRGB / 12.92 : Math.pow((bsRGB + 0.055) / 1.055, 2.4);
+
+    // Calculate relative luminance
+    return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+  }
+
+  function hexToRGB(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : { r: 0, g: 0, b: 0 };
+  }
+
+  function getContrastRatio(color1, color2) {
+    const rgb1 = hexToRGB(color1);
+    const rgb2 = hexToRGB(color2);
+
+    const lum1 = getRelativeLuminance(rgb1.r, rgb1.g, rgb1.b);
+    const lum2 = getRelativeLuminance(rgb2.r, rgb2.g, rgb2.b);
+
+    const lighter = Math.max(lum1, lum2);
+    const darker = Math.min(lum1, lum2);
+
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  function getAccessibleColor(textColor, backgroundColor) {
+    // WCAG AA requires 4.5:1 contrast ratio for normal text
+    const MIN_CONTRAST = 4.5;
+
+    const currentContrast = getContrastRatio(textColor, backgroundColor);
+
+    // If contrast is already good, return original color
+    if (currentContrast >= MIN_CONTRAST) {
+      return textColor;
+    }
+
+    // Try white or black as alternatives
+    const whiteContrast = getContrastRatio('#FFFFFF', backgroundColor);
+    const blackContrast = getContrastRatio('#000000', backgroundColor);
+
+    // Return whichever has better contrast
+    if (whiteContrast >= blackContrast) {
+      return '#FFFFFF';
+    } else {
+      return '#000000';
+    }
+  }
+
+  // Helper function to get the effective background color of an element
+  function getEffectiveBackgroundColor(element) {
+    let el = element;
+    while (el && el !== document.body) {
+      const bg = window.getComputedStyle(el).backgroundColor;
+      // Check if background is not transparent
+      if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+        // Convert rgb() to hex
+        const rgb = bg.match(/\d+/g);
+        if (rgb && rgb.length >= 3) {
+          const toHex = (n) => {
+            const hex = parseInt(n).toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+          };
+          return '#' + toHex(rgb[0]) + toHex(rgb[1]) + toHex(rgb[2]);
+        }
+        return bg;
+      }
+      el = el.parentElement;
+    }
+    // Default to white if no background found
+    return '#FFFFFF';
+  }
+
+  // Helper function to get the appropriate link color (with auto-contrast if enabled)
+  function getDesktopLinkColor(parentElement) {
+    const baseColor = state.config.after_hours_desktop_link_color || '#667eea';
+    const autoContrast = state.config.after_hours_auto_contrast || false;
+
+    if (!autoContrast) {
+      return baseColor;
+    }
+
+    // Auto-contrast is enabled - detect background and adjust if needed
+    const bgColor = getEffectiveBackgroundColor(parentElement);
+    const adjustedColor = getAccessibleColor(baseColor, bgColor);
+
+    console.log(`🎨 Auto-contrast: bg=${bgColor}, base=${baseColor}, adjusted=${adjustedColor}`);
+
+    return adjustedColor;
+  }
+
+  // Phone number regex patterns for detection
+  const PHONE_PATTERNS = [
+    /(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, // (555) 555-5555, 555-555-5555, etc.
+    /(\+?1[-.\s]?)?\d{3}[-.\s]\d{3}[-.\s]\d{4}/g, // 555-555-5555
+    /(\+?1[-.\s]?)?\(?\d{3}\)?[\s]\d{3}[-.\s]\d{4}/g, // (555) 555-5555
+    /\d{3}\.\d{3}\.\d{4}/g, // 555.555.5555
+  ];
 
   function checkDomainMatch(allowedDomain) {
     // If no domain specified, allow all (backward compatibility)
@@ -127,7 +238,7 @@
 
   async function fetchClientConfig() {
     try {
-      console.log('🔍 Fetching config for client:', CLIENT_ID);
+      console.log('🔍 Fetching after-hours config for client:', CLIENT_ID);
 
       const response = await fetch(
         `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}`,
@@ -143,7 +254,11 @@
 
       if (data && data.length > 0) {
         const config = data[0];
-        console.log('✅ Config loaded:', config.business_name);
+        console.log('✅ After-hours config loaded:', config.business_name);
+        console.log('🎨 Color Debug Info:');
+        console.log('   - Sidebar Panel Color (brand_color):', config.brand_color || 'NOT SET');
+        console.log('   - Desktop Link Color (after_hours_desktop_link_color):', config.after_hours_desktop_link_color || 'NOT SET (will use default #667eea)');
+        console.log('   - Are they different?', config.brand_color !== config.after_hours_desktop_link_color ? '✅ YES' : '❌ NO (same value)');
         return config;
       } else {
         console.error('❌ No config found for client:', CLIENT_ID);
@@ -155,235 +270,847 @@
     }
   }
 
-  async function getHeadlines(config) {
-    const currentPath = window.TEST_PATH || window.location.pathname;
-    const cacheKey = `headlines_${CLIENT_ID}_${currentPath}`;
-    const cached = sessionStorage.getItem(cacheKey);
-
-    if (cached) {
-      console.log('📦 Using cached headlines');
-      return JSON.parse(cached);
+  function isAfterHours(config) {
+    if (!config.after_hours_enabled) {
+      return false;
     }
 
-    try {
-      console.log('📋 Loading headlines for page:', currentPath);
+    // Get current time and day in client's timezone
+    const now = new Date();
+    const timezone = config.after_hours_timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-      let response = await fetch(
-        `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}&page_url=eq.${encodeURIComponent(currentPath)}`,
-        {
-          headers: {
-            'apikey': SUPABASE.key,
-            'Authorization': `Bearer ${SUPABASE.key}`
-          },
-          cache: 'no-store'
+    const localTime = now.toLocaleTimeString('en-US', {
+      hour12: false,
+      timeZone: timezone
+    });
+
+    // Get day of week (0 = Sunday, 6 = Saturday)
+    // Convert to target timezone first, then get day of week
+    const dayOfWeek = new Date(now.toLocaleString('en-US', {
+      timeZone: timezone
+    })).getDay();
+
+    const isSaturday = dayOfWeek === 6;
+    const isSunday = dayOfWeek === 0;
+    const isWeekend = isSaturday || isSunday;
+
+    // Check if closed on weekends
+    if (isWeekend && config.after_hours_closed_weekends) {
+      console.log('📅 Weekend detected - business closed all day');
+      return true; // Widget active all day on weekends
+    }
+
+    // Get current time in minutes
+    const [hours, minutes] = localTime.split(':').map(Number);
+    const currentMinutes = hours * 60 + minutes;
+
+    // Determine which schedule to use
+    let startTime, endTime;
+
+    if (isSaturday && config.after_hours_saturday_start) {
+      // Custom Saturday hours
+      if (!config.after_hours_saturday_enabled) {
+        console.log('📅 Saturday - business closed all day');
+        return true; // Closed all day Saturday
+      }
+      startTime = config.after_hours_saturday_start || '09:00';
+      endTime = config.after_hours_saturday_end || '17:00';
+      console.log('📅 Using custom Saturday hours:', startTime, '-', endTime);
+    } else if (isSunday && config.after_hours_sunday_start) {
+      // Custom Sunday hours
+      if (!config.after_hours_sunday_enabled) {
+        console.log('📅 Sunday - business closed all day');
+        return true; // Closed all day Sunday
+      }
+      startTime = config.after_hours_sunday_start || '09:00';
+      endTime = config.after_hours_sunday_end || '17:00';
+      console.log('📅 Using custom Sunday hours:', startTime, '-', endTime);
+    } else {
+      // Default weekday hours (or weekend if no custom schedule)
+      startTime = config.after_hours_start || '17:00';
+      endTime = config.after_hours_end || '09:00';
+      const dayName = isWeekend ? (isSaturday ? 'Saturday' : 'Sunday') : 'weekday';
+      console.log('📅 Using default weekday hours for', dayName + ':', startTime, '-', endTime);
+    }
+
+    // Parse start and end times
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+
+    // Handle overnight periods (e.g., 5 PM to 9 AM)
+    if (startMinutes > endMinutes) {
+      return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+    } else {
+      return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+    }
+  }
+
+  function createPopupHTML(config) {
+    const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    const buttonColor = config.after_hours_button_color || '#667eea';
+    const buttonTextColor = config.after_hours_button_text_color || '#FFFFFF';
+    const popupMessage = config.after_hours_message || "We're currently closed. Book online instead!";
+    const allowCall = config.after_hours_allow_call !== false; // default true
+    const popupIcon = config.after_hours_popup_icon || '🌙'; // Use custom icon or default to moon
+
+    // Use show_branding from database config (set based on subscription plan)
+    // Pro, Premium, and Unlimited plans have show_branding=false
+    const showBranding = config.show_branding !== false;
+
+    // Determine booking URL with custom URL override
+    let bookingUrl;
+    if (config.after_hours_use_custom_url && config.after_hours_custom_url && config.after_hours_custom_url.trim()) {
+      // Use custom URL if enabled and provided
+      let customUrl = config.after_hours_custom_url.trim();
+      // Ensure URL has protocol to prevent relative path issues
+      if (!customUrl.match(/^https?:\/\//i) && !customUrl.startsWith('tel:') && !customUrl.startsWith('mailto:')) {
+        customUrl = 'https://' + customUrl;
+      }
+      bookingUrl = customUrl;
+      console.log('🔗 Using custom URL for after hours:', bookingUrl);
+    } else {
+      // Fall back to default booking URL
+      bookingUrl = config.booking_url || '#';
+    }
+
+    return `
+      <div id="after-hours-overlay" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.3s ease-in-out;
+        font-family: ${fontFamily};
+      ">
+        <style>
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slideUp {
+            from {
+              opacity: 0;
+              transform: translateY(30px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        </style>
+
+        <div style="
+          background: white;
+          border-radius: 16px;
+          padding: 32px 24px;
+          max-width: 90%;
+          width: 400px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          animation: slideUp 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+          text-align: center;
+          font-family: inherit;
+        ">
+          <div style="
+            font-size: 48px;
+            margin-bottom: 20px;
+          ">
+            ${popupIcon}
+          </div>
+
+          <h2 style="
+            margin: 0 0 16px 0;
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+            font-family: inherit;
+          ">
+            After Hours
+          </h2>
+
+          <p style="
+            margin: 0 0 28px 0;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #666;
+            font-family: inherit;
+          ">
+            ${popupMessage}
+          </p>
+
+          <a href="${bookingUrl}"
+             id="after-hours-book-btn"
+             style="
+            display: block;
+            background: ${buttonColor};
+            color: ${buttonTextColor};
+            padding: 16px 28px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: ${allowCall ? '16px' : '0'};
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            font-family: inherit;
+          " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.2)'"
+             onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'">
+            📅 Book Online Now
+          </a>
+
+          ${allowCall ? `
+            <button id="after-hours-call-anyway" style="
+              background: none;
+              border: none;
+              color: #999;
+              font-size: 14px;
+              cursor: pointer;
+              padding: 8px;
+              text-decoration: underline;
+              font-family: inherit;
+            ">
+              Call anyway
+            </button>
+          ` : `
+            <button id="after-hours-close" style="
+              background: none;
+              border: none;
+              color: #999;
+              font-size: 14px;
+              cursor: pointer;
+              padding: 8px;
+              font-family: inherit;
+            ">
+              Close
+            </button>
+          `}
+
+          ${showBranding ? `
+          <div style="
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+            font-size: 10px;
+            color: #999;
+            font-family: inherit;
+          ">
+            <a href="https://cravemedia.io" target="_blank" rel="noopener noreferrer" style="color: #999; text-decoration: none;">
+              Powered by cravemedia.io
+            </a>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function showPopup(telUrl) {
+    const existing = document.getElementById('after-hours-overlay');
+    if (existing) existing.remove();
+
+    const container = document.createElement('div');
+    container.innerHTML = createPopupHTML(state.config);
+    const popup = container.firstElementChild;
+    document.body.appendChild(popup);
+
+    // Track impression
+    trackEvent('popup_shown');
+
+    // Handle book button click
+    const bookBtn = document.getElementById('after-hours-book-btn');
+    if (bookBtn) {
+      bookBtn.addEventListener('click', () => {
+        trackEvent('booking_clicked');
+        removePopup();
+      });
+    }
+
+    // Handle "call anyway" or "close" button
+    const callAnywayBtn = document.getElementById('after-hours-call-anyway');
+    const closeBtn = document.getElementById('after-hours-close');
+
+    if (callAnywayBtn) {
+      callAnywayBtn.addEventListener('click', () => {
+        trackEvent('call_anyway');
+        removePopup();
+        window.location.href = telUrl;
+      });
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        trackEvent('popup_dismissed');
+        removePopup();
+      });
+    }
+
+    // Close on overlay click
+    popup.addEventListener('click', (e) => {
+      if (e.target.id === 'after-hours-overlay') {
+        trackEvent('popup_dismissed');
+        removePopup();
+      }
+    });
+  }
+
+  function removePopup() {
+    const popup = document.getElementById('after-hours-overlay');
+    if (popup) {
+      popup.style.animation = 'fadeIn 0.2s ease-in-out reverse';
+      setTimeout(() => popup.remove(), 200);
+    }
+  }
+
+  function shouldInterceptPhone(telHref) {
+    const phoneMatchMode = state.config.after_hours_phone_match_mode || 'all';
+
+    // If matching all phones, always intercept
+    if (phoneMatchMode === 'all') {
+      return true;
+    }
+
+    // If specific mode, check if this phone matches the target
+    if (phoneMatchMode === 'specific') {
+      const targetPhone = state.config.after_hours_target_phone;
+      if (!targetPhone) {
+        console.warn('⚠️ Specific phone match mode enabled but no target phone set. Defaulting to match all.');
+        return true;
+      }
+
+      // Extract phone number from tel: link
+      const linkPhone = telHref.replace('tel:', '').trim();
+      const normalizedLink = normalizePhoneNumber(linkPhone);
+      const normalizedTarget = normalizePhoneNumber(targetPhone);
+
+      const matches = normalizedLink === normalizedTarget;
+      if (!matches) {
+        console.log(`📞 Skipping phone ${linkPhone} (doesn't match target ${targetPhone})`);
+      }
+      return matches;
+    }
+
+    return true;
+  }
+
+  function interceptTelLinks() {
+    // Intercept tel: link clicks based on matching mode
+    document.addEventListener('click', (e) => {
+      if (!state.isAfterHours || !state.isMobile) return;
+
+      // Find the closest anchor tag
+      let target = e.target;
+      while (target && target.tagName !== 'A') {
+        target = target.parentElement;
+      }
+
+      if (target && target.href && target.href.startsWith('tel:')) {
+        // Check if we should intercept this specific phone number
+        if (shouldInterceptPhone(target.href)) {
+          e.preventDefault();
+          e.stopPropagation();
+          showPopup(target.href);
         }
-      );
+      }
+    }, true); // Use capture phase to intercept before other handlers
 
-      let data = await response.json();
+    const matchMode = state.config.after_hours_phone_match_mode || 'all';
+    if (matchMode === 'specific') {
+      console.log('📞 Mobile tel: link interception active (specific number mode)');
+      console.log('   Target phone:', state.config.after_hours_target_phone);
+    } else {
+      console.log('📞 Mobile tel: link interception active (all numbers)');
+    }
+  }
 
-      if (!data || data.length === 0) {
-        console.log('🔍 No exact match, checking additional URLs...');
+  function normalizePhoneNumber(phone) {
+    // Remove all non-digit characters
+    return phone.replace(/\D/g, '');
+  }
 
-        response = await fetch(
-          `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}`,
-          {
-            headers: {
-              'apikey': SUPABASE.key,
-              'Authorization': `Bearer ${SUPABASE.key}`
-            },
-            cache: 'no-store'
+  function isPhoneNumber(text) {
+    const normalized = normalizePhoneNumber(text);
+    // Check if it's 10 or 11 digits (US phone format)
+    return normalized.length === 10 || (normalized.length === 11 && normalized[0] === '1');
+  }
+
+  function replacePhoneNumbers() {
+    if (state.isMobile) return; // Only run on desktop
+
+    const phoneMatchMode = state.config.after_hours_phone_match_mode || 'all';
+    if (phoneMatchMode === 'specific') {
+      console.log('🔍 Scanning page for phone numbers (specific number mode)...');
+      console.log('   Target phone:', state.config.after_hours_target_phone);
+    } else {
+      console.log('🔍 Scanning page for phone numbers (all numbers)...');
+    }
+
+    // Parse vanity numbers from config if provided
+    const vanityNumbers = [];
+    if (state.config.after_hours_vanity_numbers && state.config.after_hours_vanity_numbers.trim()) {
+      const rawVanities = state.config.after_hours_vanity_numbers.split(',');
+      rawVanities.forEach(v => {
+        const trimmed = v.trim();
+        if (trimmed) {
+          vanityNumbers.push(trimmed);
+        }
+      });
+      if (vanityNumbers.length > 0) {
+        console.log('📱 Vanity numbers to detect:', vanityNumbers);
+      }
+    }
+
+    const treeWalker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: function(node) {
+          // Skip script, style, and already processed nodes
+          if (node.parentElement.tagName === 'SCRIPT' ||
+              node.parentElement.tagName === 'STYLE' ||
+              node.parentElement.tagName === 'NOSCRIPT' ||
+              node.parentElement.hasAttribute('data-after-hours-processed') ||
+              node.parentElement.closest('[data-after-hours-processed]')) {
+            return NodeFilter.FILTER_REJECT;
           }
-        );
 
-        const allPages = await response.json();
-        var isPageExcluded = false;
+          // Check if text contains a phone-like pattern
+          const text = node.textContent.trim();
+          if (text.length < 10) return NodeFilter.FILTER_REJECT;
 
-        for (var i = 0; i < allPages.length; i++) {
-          const page = allPages[i];
-
-          var additionalUrls = page.additional_urls;
-          var excludedUrls = page.excluded_urls;
-
-          if (typeof additionalUrls === 'string') {
-            try {
-              additionalUrls = JSON.parse(additionalUrls);
-            } catch (e) {
-              additionalUrls = [];
+          for (const pattern of PHONE_PATTERNS) {
+            // Reset regex lastIndex
+            pattern.lastIndex = 0;
+            if (pattern.test(text)) {
+              return NodeFilter.FILTER_ACCEPT;
             }
           }
 
-          if (typeof excludedUrls === 'string') {
-            try {
-              excludedUrls = JSON.parse(excludedUrls);
-            } catch (e) {
-              excludedUrls = [];
-            }
-          }
+          return NodeFilter.FILTER_REJECT;
+        }
+      }
+    );
 
-          if (!Array.isArray(additionalUrls)) additionalUrls = [];
-          if (!Array.isArray(excludedUrls)) excludedUrls = [];
+    const nodesToReplace = [];
+    let node;
+    while (node = treeWalker.nextNode()) {
+      nodesToReplace.push(node);
+    }
 
-          console.log('🔍 Checking page:', page.page_url);
-          console.log('   Additional URLs:', additionalUrls);
-          console.log('   Excluded URLs:', excludedUrls);
+    let replacementCount = 0;
+    const afterHoursLabel = state.config.after_hours_label || 'After Hours';
+    const bookingText = state.config.after_hours_booking_text || 'Book Online';
 
-          if (excludedUrls && excludedUrls.length > 0) {
-            var isExcluded = false;
-            for (var j = 0; j < excludedUrls.length; j++) {
-              var excludedUrl = excludedUrls[j];
-              if (excludedUrl.indexOf('*') !== -1) {
-                var parts = excludedUrl.split('*');
-                var match = true;
-                var searchFrom = 0;
-                for (var k = 0; k < parts.length; k++) {
-                  if (parts[k] === '') continue;
-                  var idx = currentPath.indexOf(parts[k], searchFrom);
-                  if (idx === -1) {
-                    match = false;
-                    break;
-                  }
-                  searchFrom = idx + parts[k].length;
-                }
-                if (match) {
-                  isExcluded = true;
-                  break;
-                }
-              } else if (currentPath === excludedUrl) {
-                isExcluded = true;
-                break;
-              }
-            }
+    // Determine booking URL with custom URL override
+    let bookingUrl;
+    if (state.config.after_hours_use_custom_url && state.config.after_hours_custom_url && state.config.after_hours_custom_url.trim()) {
+      let customUrl = state.config.after_hours_custom_url.trim();
+      // Ensure URL has protocol to prevent relative path issues
+      if (!customUrl.match(/^https?:\/\//i) && !customUrl.startsWith('tel:') && !customUrl.startsWith('mailto:')) {
+        customUrl = 'https://' + customUrl;
+      }
+      bookingUrl = customUrl;
+    } else {
+      bookingUrl = state.config.booking_url || '#';
+    }
 
-            if (isExcluded) {
-              console.log('🚫 Page is excluded by:', page.page_url);
-              isPageExcluded = true;
+    nodesToReplace.forEach(textNode => {
+      const text = textNode.textContent;
+      let modifiedText = text;
+      const replacedPhones = new Set(); // Track replaced numbers to avoid duplicates
+
+      // Create a combined pattern to find all phone numbers
+      const combinedPattern = /(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
+      const matches = [...text.matchAll(combinedPattern)];
+
+      if (matches.length === 0) return;
+
+      // Process matches in reverse order to maintain string positions
+      for (let i = matches.length - 1; i >= 0; i--) {
+        const match = matches[i];
+        const phoneText = match[0];
+
+        // Skip if already replaced or not a valid phone
+        if (replacedPhones.has(phoneText) || !isPhoneNumber(phoneText)) {
+          continue;
+        }
+
+        replacedPhones.add(phoneText);
+        const normalizedPhone = normalizePhoneNumber(phoneText);
+
+        // Check if we should replace this phone number based on matching mode
+        const phoneMatchMode = state.config.after_hours_phone_match_mode || 'all';
+        if (phoneMatchMode === 'specific') {
+          const targetPhone = state.config.after_hours_target_phone;
+          if (targetPhone) {
+            const normalizedTarget = normalizePhoneNumber(targetPhone);
+            if (normalizedPhone !== normalizedTarget) {
+              // Skip this phone - doesn't match target
               continue;
             }
           }
+        }
 
-          if (additionalUrls && additionalUrls.length > 0) {
-            var foundMatch = false;
-            for (var j = 0; j < additionalUrls.length; j++) {
-              var additionalUrl = additionalUrls[j];
-              console.log('   Testing:', additionalUrl, 'against', currentPath);
+        // Get flag colors and settings
+        const flagBgColor = state.config.after_hours_flag_bg || '#ffc107';
+        const flagTextColor = state.config.after_hours_flag_text || '#333';
+        const flagIcon = state.config.after_hours_icon || '🌙';
+        const flagPosition = state.config.after_hours_flag_position || 'above'; // 'above', 'left', 'right'
+        const afterHoursMode = state.config.after_hours_mode || 'block';
 
-              if (additionalUrl.indexOf('*') !== -1) {
-                var parts = additionalUrl.split('*');
-                var match = true;
-                var searchFrom = 0;
-                for (var k = 0; k < parts.length; k++) {
-                  if (parts[k] === '') continue;
-                  var idx = currentPath.indexOf(parts[k], searchFrom);
-                  if (idx === -1) {
-                    match = false;
-                    break;
-                  }
-                  searchFrom = idx + parts[k].length;
-                }
-                console.log('   Wildcard match:', match);
-                if (match) {
-                  foundMatch = true;
-                  break;
-                }
-              } else {
-                var matches = (currentPath === additionalUrl);
-                console.log('   Exact match:', matches);
-                if (matches) {
-                  foundMatch = true;
-                  break;
-                }
-              }
-            }
+        // Mobile-only mode: Skip desktop phone replacement entirely
+        if (afterHoursMode === 'mobile_only') {
+          continue; // Skip this phone number on desktop
+        }
 
-            if (foundMatch) {
-              console.log('✅ Found match in additional URLs for:', page.page_url);
-              data = [page];
-              break;
-            }
+        // Determine layout based on mode and position
+        let replacement;
+
+        if (afterHoursMode === 'flag_only') {
+          // Flag-only mode: Keep phone number functional, just add flag
+          if (flagPosition === 'above') {
+            replacement = `<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <span style="display: inline-block; line-height: 1.2;">${phoneText}</span>
+</span>`;
+          } else {
+            // Left or right position (horizontal layout)
+            const flexDirection = flagPosition === 'left' ? 'row' : 'row-reverse';
+            replacement = `<span style="display: inline-flex; flex-direction: ${flexDirection}; align-items: center; gap: 8px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <span style="display: inline-block; line-height: 1.2;">${phoneText}</span>
+</span>`;
+          }
+        } else {
+          // Block mode: Replace phone with booking link (current default behavior)
+          if (flagPosition === 'above') {
+            replacement = `<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <a href="${bookingUrl}"
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
+            font-weight: 600;
+            font-size: 14px;
+            text-decoration: none;
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
+            line-height: 1.2;"
+     data-after-hours-book="true"
+     onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('phone_replacement_clicked')">
+    ${bookingText}
+  </a>
+</span>`;
+          } else {
+            // Left or right position (horizontal layout)
+            const flexDirection = flagPosition === 'left' ? 'row' : 'row-reverse';
+            replacement = `<span style="display: inline-flex; flex-direction: ${flexDirection}; align-items: center; gap: 8px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <a href="${bookingUrl}"
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
+            font-weight: 600;
+            font-size: 14px;
+            text-decoration: none;
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
+            line-height: 1.2;"
+     data-after-hours-book="true"
+     onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('phone_replacement_clicked')">
+    ${bookingText}
+  </a>
+</span>`;
           }
         }
+
+        // Replace in the modified text
+        const startPos = match.index;
+        const endPos = startPos + phoneText.length;
+        modifiedText = modifiedText.substring(0, startPos) + replacement + modifiedText.substring(endPos);
+
+        replacementCount++;
       }
 
-      // Don't block if we found a specific match - explicit includes override exclusions
-      if (isPageExcluded && (!data || data.length === 0)) {
-        console.log('⛔ Page is excluded and no specific match found - sidebar will not show');
-        return null;
-      }
+      if (replacedPhones.size > 0) {
+        const span = document.createElement('span');
+        span.innerHTML = modifiedText;
+        span.setAttribute('data-after-hours-processed', 'true');
+        textNode.parentElement.replaceChild(span, textNode);
 
-      if (isPageExcluded && data && data.length > 0) {
-        console.log('✅ Page was excluded by wildcard, but found specific include - showing sidebar');
+        // Apply auto-contrast if enabled
+        if (state.config.after_hours_auto_contrast) {
+          const bookingLinks = span.querySelectorAll('a[data-after-hours-book]');
+          bookingLinks.forEach(link => {
+            const adjustedColor = getDesktopLinkColor(link.parentElement);
+            // Use setProperty to properly override !important styles
+            link.style.setProperty('color', adjustedColor, 'important');
+            link.style.setProperty('border-bottom-color', adjustedColor, 'important');
+          });
+        }
       }
+    });
 
-      if (data && data.length > 0 && data[0].headlines) {
-        console.log('✅ Page-specific headlines loaded:', data[0].headlines);
-        // Store the canonical page_url for metrics aggregation
-        state.canonicalPageUrl = data[0].page_url;
-        sessionStorage.setItem(cacheKey, JSON.stringify(data[0].headlines));
-        return data[0].headlines;
+    if (replacementCount > 0) {
+      console.log(`✅ Replaced ${replacementCount} phone number(s)`);
+      trackEvent('phone_numbers_replaced', { count: replacementCount });
+    } else {
+      console.log('ℹ️ No phone numbers found on page');
+    }
+
+    // Replace vanity numbers if configured
+    if (vanityNumbers.length > 0) {
+      replaceVanityNumbers(vanityNumbers);
+    }
+  }
+
+  function replaceVanityNumbers(vanityNumbers) {
+    console.log('🔍 Scanning page for vanity numbers...');
+    console.log('🎨 Vanity Link Color Check:');
+    console.log('   - Will use color:', state.config.after_hours_desktop_link_color || '#667eea');
+    console.log('   - Sidebar panel color is:', state.config.brand_color);
+
+    const treeWalker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: function(node) {
+          // Skip script, style, and already processed nodes
+          if (node.parentElement.tagName === 'SCRIPT' ||
+              node.parentElement.tagName === 'STYLE' ||
+              node.parentElement.tagName === 'NOSCRIPT' ||
+              node.parentElement.hasAttribute('data-after-hours-processed') ||
+              node.parentElement.closest('[data-after-hours-processed]')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          // Check if text contains any vanity number
+          const text = node.textContent;
+          for (const vanity of vanityNumbers) {
+            if (text.indexOf(vanity) !== -1) {
+              return NodeFilter.FILTER_ACCEPT;
+            }
+          }
+
+          return NodeFilter.FILTER_REJECT;
+        }
+      }
+    );
+
+    const nodesToReplace = [];
+    let node;
+    while (node = treeWalker.nextNode()) {
+      nodesToReplace.push(node);
+    }
+
+    let replacementCount = 0;
+    const afterHoursLabel = state.config.after_hours_label || 'After Hours';
+    const bookingText = state.config.after_hours_booking_text || 'Book Online';
+    const flagBgColor = state.config.after_hours_flag_bg || '#ffc107';
+    const flagTextColor = state.config.after_hours_flag_text || '#333';
+    const flagIcon = state.config.after_hours_icon || '🌙';
+    const flagPosition = state.config.after_hours_flag_position || 'above';
+    const afterHoursMode = state.config.after_hours_mode || 'block';
+
+    // Determine booking URL with custom URL override
+    let bookingUrl;
+    if (state.config.after_hours_use_custom_url && state.config.after_hours_custom_url && state.config.after_hours_custom_url.trim()) {
+      // Use custom URL if enabled and provided
+      let customUrl = state.config.after_hours_custom_url.trim();
+      // Add protocol if missing
+      if (!customUrl.match(/^https?:\/\//i) && !customUrl.startsWith('tel:') && !customUrl.startsWith('mailto:')) {
+        customUrl = 'https://' + customUrl;
+      }
+      bookingUrl = customUrl;
+      console.log('🔗 Using custom URL for vanity numbers:', bookingUrl);
+    } else {
+      // Fall back to default booking URL
+      bookingUrl = state.config.booking_url || '#';
+    }
+
+    // Create replacement HTML template based on mode
+    let replacementTemplate;
+
+    if (afterHoursMode === 'flag_only') {
+      // Flag-only mode: Keep vanity number functional, just add flag
+      if (flagPosition === 'above') {
+        replacementTemplate = `<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <span style="display: inline-block; line-height: 1.2;">VANITY_NUMBER</span>
+</span>`;
       } else {
-        console.log('⛔ No page-specific headlines found - sidebar will not show');
-        return null;
+        const flexDirection = flagPosition === 'left' ? 'row' : 'row-reverse';
+        replacementTemplate = `<span style="display: inline-flex; flex-direction: ${flexDirection}; align-items: center; gap: 8px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <span style="display: inline-block; line-height: 1.2;">VANITY_NUMBER</span>
+</span>`;
       }
-    } catch (error) {
-      console.error('❌ Error loading headlines:', error);
-      console.log('⛔ Sidebar will not show due to error');
-      return null;
+    } else {
+      // Block mode: Replace vanity number with booking link
+      if (flagPosition === 'above') {
+        replacementTemplate = `<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <a href="${bookingUrl}"
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
+            font-weight: 600;
+            font-size: 14px;
+            text-decoration: none;
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
+            line-height: 1.2;"
+     data-after-hours-book="true"
+     onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('vanity_replacement_clicked')">
+    ${bookingText}
+  </a>
+</span>`;
+      } else {
+        const flexDirection = flagPosition === 'left' ? 'row' : 'row-reverse';
+        replacementTemplate = `<span style="display: inline-flex; flex-direction: ${flexDirection}; align-items: center; gap: 8px; vertical-align: middle;" data-after-hours-processed="true">
+  <span style="display: inline-block;
+               padding: 3px 10px;
+               background: ${flagBgColor};
+               color: ${flagTextColor};
+               font-size: 11px;
+               border-radius: 4px;
+               font-weight: 600;
+               white-space: nowrap;
+               line-height: 1.2;">
+    ${flagIcon} ${afterHoursLabel}
+  </span>
+  <a href="${bookingUrl}"
+     style="color: ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
+            font-weight: 600;
+            font-size: 14px;
+            text-decoration: none;
+            border-bottom: 2px solid ${state.config.after_hours_desktop_link_color || '#667eea'} !important;
+            line-height: 1.2;"
+     data-after-hours-book="true"
+     onclick="window.afterHoursTrackEvent && window.afterHoursTrackEvent('vanity_replacement_clicked')">
+    ${bookingText}
+  </a>
+</span>`;
+      }
+    }
+
+    nodesToReplace.forEach(textNode => {
+      let text = textNode.textContent;
+      let modifiedText = text;
+      let hasReplacements = false;
+
+      // Replace each vanity number found in the text
+      vanityNumbers.forEach(vanity => {
+        const escapedVanity = vanity.replace(/[.*+?^${}()|\\\[\]]/g, '\\$&');
+        const vanityRegex = new RegExp(escapedVanity, 'g');
+
+        if (modifiedText.indexOf(vanity) !== -1) {
+          // Replace VANITY_NUMBER placeholder with actual vanity number
+          const finalReplacement = replacementTemplate.replace('VANITY_NUMBER', vanity);
+          modifiedText = modifiedText.replace(vanityRegex, finalReplacement);
+          hasReplacements = true;
+          replacementCount++;
+        }
+      });
+
+      if (hasReplacements) {
+        const span = document.createElement('span');
+        span.innerHTML = modifiedText;
+        span.setAttribute('data-after-hours-processed', 'true');
+        textNode.parentElement.replaceChild(span, textNode);
+
+        // Apply auto-contrast if enabled
+        if (state.config.after_hours_auto_contrast) {
+          const bookingLinks = span.querySelectorAll('a[data-after-hours-book]');
+          bookingLinks.forEach(link => {
+            const adjustedColor = getDesktopLinkColor(link.parentElement);
+            // Use setProperty to properly override !important styles
+            link.style.setProperty('color', adjustedColor, 'important');
+            link.style.setProperty('border-bottom-color', adjustedColor, 'important');
+          });
+        }
+      }
+    });
+
+    if (replacementCount > 0) {
+      console.log(`✅ Replaced ${replacementCount} vanity number(s)`);
+      trackEvent('vanity_numbers_replaced', { count: replacementCount, vanities: vanityNumbers });
+    } else {
+      console.log('ℹ️ No vanity numbers found on page');
     }
   }
 
-  function getDefaultHeadlines() {
-    return [
-      "Need help? We're here for you!",
-      "Get started today!",
-      "Contact us now!"
-    ];
-  }
-
-  function getPerformanceData() {
+  async function trackEvent(eventType, metadata = {}) {
     try {
-      const data = localStorage.getItem('sidebarPerformance_' + CLIENT_ID);
-      return data ? JSON.parse(data) : {};
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function savePerformanceData(data) {
-    try {
-      localStorage.setItem('sidebarPerformance_' + CLIENT_ID, JSON.stringify(data));
-    } catch (e) {
-      console.error('Error saving performance:', e);
-    }
-  }
-
-  function isDismissedToday() {
-    try {
-      const dismissed = localStorage.getItem('sidebarDismissed_' + CLIENT_ID);
-      if (!dismissed) return false;
-      
-      const dismissedDate = new Date(dismissed);
-      const today = new Date();
-      
-      return dismissedDate.toDateString() === today.toDateString();
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function setDismissed() {
-    try {
-      localStorage.setItem('sidebarDismissed_' + CLIENT_ID, new Date().toISOString());
-    } catch (e) {
-      console.error('Error saving dismissed state:', e);
-    }
-  }
-
-  async function sendToSupabase(eventType, variant) {
-    // Use canonical page URL for metrics aggregation across matching pages
-    const canonicalUrl = state.canonicalPageUrl || window.TEST_PATH || window.location.pathname;
-    const actualUrl = window.TEST_PATH || window.location.pathname;
-    try {
-      await fetch(SUPABASE.url + '/rest/v1/headline_performance', {
+      await fetch(SUPABASE.url + '/rest/v1/after_hours_events', {
         method: 'POST',
         headers: {
           'apikey': SUPABASE.key,
@@ -393,553 +1120,34 @@
         },
         body: JSON.stringify({
           client_id: CLIENT_ID,
-          page_url: canonicalUrl,
-          actual_url: actualUrl,
-          headline: variant.headline,
-          event_type: eventType
+          event_type: eventType,
+          is_mobile: state.isMobile,
+          page_url: window.location.pathname,
+          metadata: metadata
         })
       });
+      console.log('📊 Event tracked:', eventType);
     } catch (error) {
-      console.error('Error sending to Supabase:', error);
+      console.error('Error tracking event:', error);
     }
   }
 
-  function trackImpression(variant) {
-    const perfData = getPerformanceData();
-    const key = variant.headline;
-    
-    if (!perfData[key]) {
-      perfData[key] = {
-        headline: variant.headline,
-        style: variant.style,
-        impressions: 0,
-        conversions: 0,
-        dismissals: 0,
-        lastShown: null
-      };
-    }
-    
-    perfData[key].impressions++;
-    perfData[key].lastShown = new Date().toISOString();
-    
-    savePerformanceData(perfData);
-    console.log('📊 Sidebar impression:', key);
-    
-    sendToSupabase('impression', variant);
-  }
+  // Expose tracking function globally for inline onclick handlers
+  window.afterHoursTrackEvent = trackEvent;
 
-  function trackConversion(variant) {
-    const perfData = getPerformanceData();
-    const key = variant.headline;
-    
-    if (perfData[key]) {
-      perfData[key].conversions++;
-      savePerformanceData(perfData);
-      
-      const rate = ((perfData[key].conversions / perfData[key].impressions) * 100).toFixed(1);
-      console.log('🎯 SIDEBAR CONVERSION!', {
-        headline: key,
-        conversions: perfData[key].conversions,
-        impressions: perfData[key].impressions,
-        rate: rate + '%'
-      });
-      
-      sendToSupabase('conversion', variant);
-    }
-  }
-
-  function trackDismissal(variant) {
-    const perfData = getPerformanceData();
-    const key = variant.headline;
-    
-    if (perfData[key]) {
-      perfData[key].dismissals++;
-      savePerformanceData(perfData);
-      console.log('❌ Sidebar dismissed:', key);
-    }
-  }
-
-  function selectBestVariant(variants) {
-    const perfData = getPerformanceData();
-    const epsilon = 0.2;
-    
-    if (Math.random() < epsilon || Object.keys(perfData).length === 0) {
-      const randomVariant = variants[Math.floor(Math.random() * variants.length)];
-      console.log('🎲 Sidebar exploring:', randomVariant.style);
-      return randomVariant;
-    }
-    
-    let bestVariant = variants[0];
-    let bestRate = 0;
-    
-    variants.forEach(variant => {
-      const data = perfData[variant.headline];
-      if (data && data.impressions > 0) {
-        const rate = data.conversions / data.impressions;
-        if (rate > bestRate) {
-          bestRate = rate;
-          bestVariant = variant;
-        }
-      }
-    });
-    
-    console.log('🏆 Sidebar best performer:', bestVariant.style);
-    return bestVariant;
-  }
-
-  async function selectBestVariantAggregate(variants) {
-    const epsilon = 0.2;
-    // Use canonical page URL for consistent metrics lookup
-    const pageUrl = state.canonicalPageUrl || window.TEST_PATH || window.location.pathname;
-
-    if (Math.random() < epsilon) {
-      const randomVariant = variants[Math.floor(Math.random() * variants.length)];
-      console.log('🎲 Exploring (random):', randomVariant.headline);
-      return randomVariant;
-    }
-
-    try {
-      const response = await fetch(
-        SUPABASE.url + '/rest/v1/headline_stats?client_id=eq.' + CLIENT_ID + '&page_url=eq.' + encodeURIComponent(pageUrl),
-        {
-          headers: {
-            'apikey': SUPABASE.key,
-            'Authorization': 'Bearer ' + SUPABASE.key
-          }
-        }
-      );
-
-      const stats = await response.json();
-
-      if (!stats || stats.length === 0) {
-        console.log('📊 No stats yet, showing first headline');
-        return variants[0];
-      }
-
-      let bestHeadline = null;
-      let bestRate = 0;
-
-      stats.forEach(stat => {
-        if (stat.conversion_rate > bestRate) {
-          bestRate = stat.conversion_rate;
-          bestHeadline = stat.headline;
-        }
-      });
-
-      if (!bestHeadline) {
-        return variants[0];
-      }
-
-      const bestVariant = variants.find(v => v.headline === bestHeadline);
-
-      if (bestVariant) {
-        console.log('🏆 Global winner (' + bestRate + '%):', bestHeadline);
-        return bestVariant;
-      }
-
-      return variants[0];
-
-    } catch (error) {
-      console.error('Error fetching aggregate stats:', error);
-      return selectBestVariant(variants);
-    }
-  }
-
-  function showAnalytics() {
-    const perfData = getPerformanceData();
-    console.log('\n📊 === SIDEBAR PERFORMANCE ANALYTICS ===');
-    console.log('Client:', CLIENT_ID);
-    console.log('Business:', state.config?.business_name);
-    console.log('\nMessage Performance:');
-    
-    let totalImpressions = 0;
-    let totalConversions = 0;
-    let totalDismissals = 0;
-    
-    const sortedData = Object.values(perfData).sort((a, b) => {
-      const rateA = a.impressions > 0 ? a.conversions / a.impressions : 0;
-      const rateB = b.impressions > 0 ? b.conversions / b.impressions : 0;
-      return rateB - rateA;
-    });
-    
-    sortedData.forEach(data => {
-      const cvRate = data.impressions > 0 
-        ? ((data.conversions / data.impressions) * 100).toFixed(1) + '%'
-        : '0%';
-      const dismissRate = data.impressions > 0
-        ? ((data.dismissals / data.impressions) * 100).toFixed(1) + '%'
-        : '0%';
-      
-      console.log(`\n${data.style}:`);
-      console.log(`  "${data.headline}"`);
-      console.log(`  Impressions: ${data.impressions}`);
-      console.log(`  Conversions: ${data.conversions} (${cvRate})`);
-      console.log(`  Dismissals: ${data.dismissals} (${dismissRate})`);
-      
-      totalImpressions += data.impressions;
-      totalConversions += data.conversions;
-      totalDismissals += data.dismissals;
-    });
-    
-    const overallRate = totalImpressions > 0
-      ? ((totalConversions / totalImpressions) * 100).toFixed(1) + '%'
-      : '0%';
-    
-    console.log('\n=== OVERALL ===');
-    console.log('Total Impressions:', totalImpressions);
-    console.log('Total Conversions:', totalConversions);
-    console.log('Total Dismissals:', totalDismissals);
-    console.log('Conversion Rate:', overallRate);
-    console.log('================\n');
-  }
-
-  function createVariantsFromHeadlines(headlines) {
-    const styles = ['helpful', 'urgency', 'social-proof', 'risk-reversal', 'discount'];
-    const defaultMessage = state.config.sidebar_subline || "We're here to help you get started. Reach out today!";
-    
-    return headlines.map((headline, index) => ({
-      headline: headline,
-      message: defaultMessage,
-      style: styles[index % styles.length]
-    }));
-  }
-
-  function createSidebarHTML(variant, config) {
-    const buttonText = config.sidebar_button_text ||
-      (config.button_type === 'call' ? `📞 Call Now` : '📅 Book Online');
-
-    // Determine button link with custom URL override
-    let buttonLink;
-    if (config.sidebar_use_custom_url && config.sidebar_custom_url && config.sidebar_custom_url.trim()) {
-      // Use custom URL if enabled and provided
-      let customUrl = config.sidebar_custom_url.trim();
-      // Ensure URL has protocol to prevent relative path issues
-      if (!customUrl.match(/^https?:\/\//i) && !customUrl.startsWith('tel:') && !customUrl.startsWith('mailto:')) {
-        customUrl = 'https://' + customUrl;
-      }
-      buttonLink = customUrl;
-      console.log('🔗 Using custom URL for sidebar:', buttonLink);
-    } else {
-      // Fall back to default behavior
-      buttonLink = config.button_type === 'call'
-        ? `tel:${config.phone_number.replace(/\D/g, '')}`
-        : config.booking_url;
-    }
-
-    const sidePosition = (config.position === 'left')
-      ? `left: -380px; right: auto;`
-      : `right: -380px; left: auto;`;
-
-    const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-    const sidebarIcon = config.sidebar_icon || '💬';
-    const textColor = config.sidebar_text_color || '#FFFFFF';
-    const buttonColor = config.sidebar_button_color || '#FFFFFF';
-    const buttonTextColor = config.sidebar_button_text_color || '#000000';
-
-    return `
-      <div id="vertical-sidebar" style="
-        position: fixed;
-        top: 0;
-        bottom: 0;
-        ${sidePosition}
-        width: 380px;
-        height: 100vh;
-        background: ${config.brand_color ? `linear-gradient(180deg, ${config.brand_color} 0%, ${adjustColor(config.brand_color, -20)} 100%)` : 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)'};
-        color: ${textColor};
-        box-shadow: ${(config.position === 'left') ? '4px' : '-4px'} 0 30px rgba(0, 0, 0, 0.4);
-        z-index: 2147483647;
-        font-family: ${fontFamily};
-        transition: ${(config.position === 'left') ? 'left' : 'right'} 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-      ">
-        <style>
-          @keyframes fadeMessage {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-          }
-          #vertical-sidebar::-webkit-scrollbar {
-            width: 8px;
-          }
-          #vertical-sidebar::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.1);
-          }
-          #vertical-sidebar::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 4px;
-          }
-          #vertical-sidebar::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.5);
-          }
-          @media (max-width: 768px) {
-            #vertical-sidebar {
-              width: 85vw !important;
-            }
-            #sidebar-phone-number {
-              display: none !important;
-            }
-          }
-          @media (max-width: 480px) {
-            #vertical-sidebar {
-              width: 100vw !important;
-            }
-          }
-        </style>
-        
-        <button id="sidebar-dismiss" style="
-          position: absolute;
-          top: 20px;
-          ${(config.position === 'left') ? 'right: 20px;' : 'left: 20px;'}
-          background: rgba(255, 255, 255, 0.2);
-          border: none;
-          color: #ffffff;
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          cursor: pointer;
-          font-size: 24px;
-          line-height: 1;
-          transition: all 0.3s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-          z-index: 10;
-          font-family: inherit;
-        " onmouseover="this.style.background='rgba(255,255,255,0.4)'; this.style.transform='rotate(90deg)'" 
-           onmouseout="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='rotate(0deg)'">
-          ×
-        </button>
-        
-        <div style="
-          padding: 60px 40px;
-          max-width: 100%;
-          width: 100%;
-          box-sizing: border-box;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          min-height: 100vh;
-        ">
-          <div style="text-align: center; margin-bottom: 40px; width: 100%;">
-            <div style="
-              font-size: 60px;
-              margin-bottom: 20px;
-              opacity: 0.9;
-            ">
-              ${sidebarIcon}
-            </div>
-            
-            <h2 id="sidebar-headline" style="
-              margin: 0 0 20px 0;
-              font-size: 32px;
-              font-weight: 700;
-              line-height: 1.2;
-              font-family: inherit;
-            ">
-              ${variant.headline}
-            </h2>
-            
-            <p id="sidebar-message" style="
-              margin: 0 0 40px 0;
-              font-size: 18px;
-              line-height: 1.6;
-              opacity: 0.95;
-              font-family: inherit;
-            ">
-              ${variant.message}
-            </p>
-          </div>
-          
-          <div style="width: 100%;">
-            <a href="${buttonLink}"
-               id="sidebar-cta-btn"
-               style="
-              display: block;
-              background: ${buttonColor};
-              color: ${buttonTextColor};
-              padding: 20px 32px;
-              border-radius: 12px;
-              text-decoration: none;
-              font-weight: 700;
-              font-size: 18px;
-              text-align: center;
-              transition: all 0.3s;
-              box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-              margin-bottom: 20px;
-              font-family: inherit;
-            " onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,0.4)'"
-               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.3)'">
-              ${buttonText}
-            </a>
-            
-            ${config.button_type === 'call' ? `
-              <p id="sidebar-phone-number" style="
-                text-align: center;
-                font-size: 22px;
-                font-weight: 600;
-                margin: 0 0 40px 0;
-                opacity: 0.95;
-                font-family: inherit;
-              ">
-                ${config.phone_number}
-              </p>
-            ` : ''}
-            
-            <div style="
-              text-align: center;
-              padding-top: 40px;
-              border-top: 1px solid rgba(255, 255, 255, 0.2);
-            ">
-              <p style="
-                margin: 0;
-                font-size: 12px;
-                opacity: 0.6;
-                font-family: inherit;
-              ">
-                ${config.business_name}
-              </p>
-              ${config.show_branding !== false ? `
-              <p style="
-                margin: 10px 0 0 0;
-                font-size: 10px;
-                opacity: 0.5;
-                font-family: inherit;
-              ">
-                <a href="https://cravemedia.io" target="_blank" rel="noopener noreferrer" style="color: rgba(255, 255, 255, 0.7); text-decoration: none;">
-                  Powered by cravemedia.io
-                </a>
-              </p>
-              ` : ''}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  function adjustColor(color, percent) {
-    const num = parseInt(color.replace("#",""), 16);
-    const amt = Math.round(2.55 * percent);
-    const R = (num >> 16) + amt;
-    const G = (num >> 8 & 0x00FF) + amt;
-    const B = (num & 0x0000FF) + amt;
-    return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 +
-      (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255))
-      .toString(16).slice(1);
-  }
-
-  function showSidebar(variant) {
-    if (state.isVisible) return;
-    
-    trackImpression(variant);
-    state.currentVariant = variant;
-    state.isVisible = true;
-    
-    const existing = document.getElementById('vertical-sidebar');
-    if (existing) existing.remove();
-    
-    const container = document.createElement('div');
-    container.innerHTML = createSidebarHTML(variant, state.config);
-    const sidebar = container.firstElementChild;
-    document.body.appendChild(sidebar);
-    
-    setTimeout(() => {
-      const sideProperty = (state.config.position === 'left') ? 'left' : 'right';
-      sidebar.style[sideProperty] = '0';
-    }, 100);
-    
-    const ctaBtn = document.getElementById('sidebar-cta-btn');
-    const dismissBtn = document.getElementById('sidebar-dismiss');
-    
-    ctaBtn.addEventListener('click', () => {
-      trackConversion(state.currentVariant);
-
-      if (window.gtag) {
-        gtag('event', 'conversion', {
-          'event_category': 'Sidebar Widget',
-          'event_label': state.config.button_type,
-          'variant': state.currentVariant.headline,
-          'variant_style': state.currentVariant.style
-        });
-      }
-    });
-    
-    if (dismissBtn) {
-      dismissBtn.addEventListener('click', () => {
-        trackDismissal(state.currentVariant);
-        hideSidebar();
-      });
-    }
-  }
-
-  function hideSidebar() {
-    const sidebar = document.getElementById('vertical-sidebar');
-    if (!sidebar) return;
-    
-    const sideProperty = (state.config.position === 'left') ? 'left' : 'right';
-    sidebar.style[sideProperty] = '-380px';
-    
-    setTimeout(() => {
-      sidebar.remove();
-      state.isVisible = false;
-      state.isDismissed = true;
-      setDismissed();
-      
-      if (state.rotationTimer) {
-        clearInterval(state.rotationTimer);
-      }
-    }, 500);
-  }
-
-  function startRotation(variants) {
-    if (variants.length <= 1) return;
-    
-    state.rotationTimer = setInterval(() => {
-      if (state.isDismissed || !state.isVisible) {
-        clearInterval(state.rotationTimer);
-        return;
-      }
-      
-      state.currentIndex = (state.currentIndex + 1) % variants.length;
-      const nextVariant = variants[state.currentIndex];
-      
-      state.currentVariant = nextVariant;
-      trackImpression(nextVariant);
-      
-      const headlineEl = document.getElementById('sidebar-headline');
-      const messageEl = document.getElementById('sidebar-message');
-      
-      if (headlineEl && messageEl) {
-        headlineEl.style.animation = 'fadeMessage 0.6s ease-in-out';
-        messageEl.style.animation = 'fadeMessage 0.6s ease-in-out';
-        
-        setTimeout(() => {
-          headlineEl.textContent = nextVariant.headline;
-          messageEl.textContent = nextVariant.message;
-        }, 300);
-      }
-    }, 10000);
-  }
+  // Expose state for debugging
+  window.afterHoursDebugState = state;
 
   async function init() {
-    console.log('🚀 AI-Powered Sidebar initializing...');
-    console.log('📦 Widget Version: v50.5 - Hide Phone on Mobile (Call Button)');
+    console.log('🚀 After-Hours Widget initializing...');
+    console.log('📦 Widget Version: 2025-11-17 Weekend Schedule Support');
     console.log('🆔 Client ID:', CLIENT_ID);
-
-    if (window.TEST_PATH) {
-      console.log('🧪 TEST MODE: Simulating path:', window.TEST_PATH);
-    }
+    console.log('📱 Device:', state.isMobile ? 'Mobile' : 'Desktop');
 
     state.config = await fetchClientConfig();
 
     if (!state.config) {
-      console.error('❌ Could not load config. Widget will not display.');
+      console.error('❌ Could not load config. Widget will not activate.');
       return;
     }
 
@@ -958,69 +1166,128 @@
     }
 
     // Check if widget is enabled for this client
-    const isEnabled = await checkIfWidgetEnabled('sidebar', CLIENT_ID);
+    const isEnabled = await checkIfWidgetEnabled('after_hours', CLIENT_ID);
     if (!isEnabled) {
       console.log('🚫 Widget blocked: Not enabled for this client');
       return;
     }
-    
-    if (isDismissedToday()) {
-      console.log('⏸️ Sidebar was dismissed today, skipping');
+
+    if (!state.config.after_hours_enabled) {
+      console.log('ℹ️ After-hours widget is not enabled for this client');
       return;
     }
-    
-    const headlines = await getHeadlines(state.config);
-    
-    if (!headlines) {
-      console.log('⛔ Sidebar blocked on this page (excluded URL)');
+
+    // Log test mode if active
+    if (state.forceActive || state.forceMobile) {
+      console.log('🧪 TEST MODE ACTIVE - forceActive:', state.forceActive, 'forceMobile:', state.forceMobile);
+    }
+
+    state.isAfterHours = state.forceActive || isAfterHours(state.config);
+    const effectiveIsMobile = state.forceMobile || state.isMobile;
+
+    if (!state.isAfterHours) {
+      console.log('ℹ️ Currently within business hours - widget inactive');
+      console.log('💡 To test, use: activateAfterHoursTestMode(true) or activateAfterHoursTestMode(true, true) for mobile');
       return;
     }
-    
-    const variants = createVariantsFromHeadlines(headlines);
-    const selectedVariant = await selectBestVariantAggregate(variants);
-    
-    setTimeout(() => {
-      showSidebar(selectedVariant);
-      
-      if (variants.length > 1) {
-        console.log('🔄 Starting message rotation');
-        startRotation(variants);
-      }
-    }, 3000);
-    
-    console.log('✅ Sidebar ready!');
-    console.log('💡 Type showSidebarAnalytics() to view performance');
-    
-    window.showSidebarAnalytics = showAnalytics;
-    
-    window.showSidebarConfig = function() {
-      console.log('Current sidebar config:', state.config);
-      console.log('Sidebar icon:', state.config?.sidebar_icon);
-    };
-    
-    window.clearSidebarData = function() {
-      localStorage.removeItem('sidebarPerformance_' + CLIENT_ID);
-      localStorage.removeItem('sidebarDismissed_' + CLIENT_ID);
-      sessionStorage.removeItem(`headlines_${CLIENT_ID}_${window.location.pathname}`);
-      console.log('✨ Sidebar data cleared!');
-      location.reload();
-    };
-    
-    window.toggleSidebar = function() {
-      if (state.isVisible) {
-        hideSidebar();
+
+    console.log('🌙 After-hours mode ACTIVE');
+
+    if (effectiveIsMobile) {
+      // Mobile: Intercept tel: links
+      interceptTelLinks();
+    } else {
+      // Desktop: Replace/flag phone numbers
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', replacePhoneNumbers);
       } else {
-        showSidebar(selectedVariant);
+        replacePhoneNumbers();
       }
+
+      // Also watch for dynamic content
+      const observer = new MutationObserver((mutations) => {
+        let shouldReplace = false;
+        mutations.forEach(mutation => {
+          if (mutation.addedNodes.length > 0) {
+            mutation.addedNodes.forEach(node => {
+              if (node.nodeType === Node.ELEMENT_NODE &&
+                  !node.hasAttribute('data-after-hours-processed')) {
+                shouldReplace = true;
+              }
+            });
+          }
+        });
+
+        if (shouldReplace) {
+          setTimeout(replacePhoneNumbers, 100);
+        }
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+
+      console.log('👀 Watching for dynamically added content');
+    }
+
+    console.log('✅ After-hours widget ready!');
+
+    // Helper function for testing
+    window.testAfterHoursPopup = function() {
+      const effectiveIsMobile = state.forceMobile || state.isMobile;
+      if (effectiveIsMobile) {
+        console.log('📱 Testing mobile popup...');
+        showPopup('tel:5555555555');
+      } else {
+        console.log('⚠️ Popup is only shown on mobile. On desktop, phone numbers are replaced.');
+        console.log('💡 Activate mobile test mode with: activateAfterHoursTestMode(true, true)');
+      }
+    };
+
+    window.showAfterHoursStatus = function() {
+      const effectiveIsMobile = state.forceMobile || state.isMobile;
+      console.log('After-Hours Widget Status:', {
+        enabled: state.config.after_hours_enabled,
+        isAfterHours: state.isAfterHours,
+        isMobile: state.isMobile,
+        effectiveIsMobile: effectiveIsMobile,
+        timezone: state.config.after_hours_timezone,
+        startTime: state.config.after_hours_start,
+        endTime: state.config.after_hours_end,
+        allowCallOnMobile: state.config.after_hours_allow_call,
+        phoneMatchMode: state.config.after_hours_phone_match_mode || 'all',
+        targetPhone: state.config.after_hours_target_phone || 'none',
+        forceActive: state.forceActive,
+        forceMobile: state.forceMobile,
+        testModeActive: state.forceActive || state.forceMobile
+      });
     };
   }
 
-  window.clearSidebarData = function() {
-    localStorage.removeItem('sidebarPerformance_' + CLIENT_ID);
-    localStorage.removeItem('sidebarDismissed_' + CLIENT_ID);
-    sessionStorage.removeItem(`headlines_${CLIENT_ID}_${window.location.pathname}`);
-    console.log('✨ Sidebar data cleared!');
-    location.reload();
+  // Global test mode activation function (uses sessionStorage to persist across reload)
+  window.activateAfterHoursTestMode = function(forceActive, forceMobile) {
+    const active = forceActive !== false; // default true
+    const mobile = forceMobile || false;
+
+    sessionStorage.setItem('AFTER_HOURS_TEST_MODE', 'true');
+    sessionStorage.setItem('AFTER_HOURS_FORCE_ACTIVE', String(active));
+    sessionStorage.setItem('AFTER_HOURS_FORCE_MOBILE', String(mobile));
+
+    console.log('🧪 Test mode configured. Reloading page...');
+    console.log('   Force Active:', active);
+    console.log('   Force Mobile:', mobile);
+
+    setTimeout(() => window.location.reload(), 500);
+  };
+
+  window.deactivateAfterHoursTestMode = function() {
+    sessionStorage.removeItem('AFTER_HOURS_TEST_MODE');
+    sessionStorage.removeItem('AFTER_HOURS_FORCE_ACTIVE');
+    sessionStorage.removeItem('AFTER_HOURS_FORCE_MOBILE');
+
+    console.log('🧪 Test mode deactivated. Reloading page...');
+    setTimeout(() => window.location.reload(), 500);
   };
 
   if (document.readyState === 'loading') {
@@ -1029,4 +1296,3 @@
     init();
   }
 })();
-
