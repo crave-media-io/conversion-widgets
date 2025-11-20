@@ -26,7 +26,8 @@
     sessionButtonText: null,     // Consistent button text for session
     sessionButtonColor: null,    // Consistent button color for session
     headlinesEnabled: true,      // Whether to show headlines
-    targetDiv: null              // The div where the widget should be rendered
+    targetDivs: [],              // Array of all divs where widget should be rendered
+    instances: []                // Array of rendered widget instances
   };
 
   // ============================================
@@ -355,6 +356,17 @@
   }
 
   function trackImpression(variant) {
+    // Deduplicate impressions across multiple instances
+    // Only track once per headline per rotation (not once per instance)
+    const rotationKey = `impression_tracked_${CLIENT_ID}_${variant.headline}_${state.currentIndex}`;
+
+    if (sessionStorage.getItem(rotationKey)) {
+      console.log('📊 Impression already tracked for this rotation');
+      return;
+    }
+
+    sessionStorage.setItem(rotationKey, 'true');
+
     const perfData = getPerformanceData();
     const key = variant.headline;
 
@@ -458,7 +470,7 @@
   // ============================================
   // CREATE SMART BUTTON HTML
   // ============================================
-  function createSmartButtonHTML(variant, config) {
+  function createSmartButtonHTML(variant, config, instanceIndex = 0) {
     // Determine button link with custom URL override
     let buttonLink;
     if (config.smart_button_use_custom_url && config.smart_button_custom_url && config.smart_button_custom_url.trim()) {
@@ -492,7 +504,7 @@
 
     // Conditionally render headline section
     const headlineSection = state.headlinesEnabled ? `
-      <h2 id="smart-button-headline" style="
+      <h2 class="smart-button-headline" style="
         margin: 0 0 20px 0;
         font-size: 28px;
         font-weight: 700;
@@ -505,7 +517,7 @@
     ` : '';
 
     return `
-      <div id="smart-button-widget" style="
+      <div class="smart-button-widget" data-instance="${instanceIndex}" style="
         max-width: 800px;
         margin: 20px auto;
         padding: 30px 40px;
@@ -524,18 +536,18 @@
             100% { opacity: 1; }
           }
           @media (max-width: 768px) {
-            #smart-button-widget {
+            .smart-button-widget {
               margin: 15px 10px !important;
               padding: 20px 25px !important;
             }
-            #smart-button-headline {
+            .smart-button-headline {
               font-size: 20px !important;
             }
-            #smart-button-cta-btn {
+            .smart-button-cta-btn {
               padding: 14px 28px !important;
               font-size: 15px !important;
             }
-            #smart-button-branding {
+            .smart-button-branding {
               margin-top: 15px !important;
             }
           }
@@ -544,7 +556,7 @@
         ${headlineSection}
 
         <a href="${buttonLink}"
-           id="smart-button-cta-btn"
+           class="smart-button-cta-btn"
            style="
           display: inline-block;
           background: ${buttonColor};
@@ -563,7 +575,7 @@
         </a>
 
         ${showBranding ? `
-        <div id="smart-button-branding" style="
+        <div class="smart-button-branding" style="
           margin-top: 12px;
           font-size: 10px;
           opacity: 0.5;
@@ -600,39 +612,56 @@
     }
     state.currentVariant = variant;
 
-    const existing = document.getElementById('smart-button-widget');
-    if (existing) existing.remove();
+    // Remove any existing instances
+    state.instances.forEach(instance => {
+      if (instance && instance.parentNode) {
+        instance.remove();
+      }
+    });
+    state.instances = [];
 
-    const container = document.createElement('div');
-    container.innerHTML = createSmartButtonHTML(variant, state.config);
-    const button = container.firstElementChild;
-
-    // Insert button into the target div
-    if (state.targetDiv) {
-      state.targetDiv.appendChild(button);
-    } else {
-      console.error('❌ No target div found for Smart Button placement');
+    if (state.targetDivs.length === 0) {
+      console.error('❌ No target divs found for Smart Button placement');
       return;
     }
 
-    // Track conversions
-    const ctaBtn = document.getElementById('smart-button-cta-btn');
-    ctaBtn.addEventListener('click', () => {
-      if (state.headlinesEnabled) {
-        trackConversion(state.currentVariant);
-      }
+    console.log(`🎯 Rendering to ${state.targetDivs.length} placement(s)`);
 
-      if (window.gtag) {
-        gtag('event', 'conversion', {
-          'event_category': 'Smart Button Widget',
-          'event_label': state.config.button_type,
-          'variant': state.currentVariant.headline,
-          'variant_style': state.currentVariant.style,
-          'button_text': state.sessionButtonText,
-          'button_color': state.sessionButtonColor
+    // Render to all target divs
+    state.targetDivs.forEach((targetDiv, index) => {
+      const container = document.createElement('div');
+      container.innerHTML = createSmartButtonHTML(variant, state.config, index);
+      const button = container.firstElementChild;
+
+      // Insert button into the target div
+      targetDiv.appendChild(button);
+      state.instances.push(button);
+
+      // Track conversions - attach listener to this instance's CTA button
+      const ctaBtn = button.querySelector('.smart-button-cta-btn');
+      if (ctaBtn) {
+        ctaBtn.addEventListener('click', () => {
+          console.log(`🖱️ Click on instance ${index + 1}`);
+
+          if (state.headlinesEnabled) {
+            trackConversion(state.currentVariant);
+          }
+
+          if (window.gtag) {
+            gtag('event', 'conversion', {
+              'event_category': 'Smart Button Widget',
+              'event_label': state.config.button_type,
+              'variant': state.currentVariant.headline,
+              'variant_style': state.currentVariant.style,
+              'button_text': state.sessionButtonText,
+              'button_color': state.sessionButtonColor
+            });
+          }
         });
       }
     });
+
+    console.log(`✅ Rendered ${state.instances.length} instance(s)`);
   }
 
   // ============================================
@@ -649,16 +678,20 @@
       state.currentVariant = nextVariant;
       trackImpression(nextVariant);
 
-      // Fade transition
-      const headlineEl = document.getElementById('smart-button-headline');
+      // Update all instances with fade transition
+      state.instances.forEach(instance => {
+        const headlineEl = instance.querySelector('.smart-button-headline');
 
-      if (headlineEl) {
-        headlineEl.style.animation = 'fadeHeadline 0.6s ease-in-out';
+        if (headlineEl) {
+          headlineEl.style.animation = 'fadeHeadline 0.6s ease-in-out';
 
-        setTimeout(() => {
-          headlineEl.textContent = nextVariant.headline;
-        }, 300);
-      }
+          setTimeout(() => {
+            headlineEl.textContent = nextVariant.headline;
+          }, 300);
+        }
+      });
+
+      console.log(`🔄 Rotated to: "${nextVariant.headline}" across ${state.instances.length} instance(s)`);
     }, 10000); // 10 seconds
   }
 
@@ -714,19 +747,19 @@
   // ============================================
   async function init() {
     console.log('🎯 Smart Button Widget initializing...');
-    console.log('📦 Widget Version: v50.5 - Div-Based Placement');
+    console.log('📦 Widget Version: v51.0 - Multi-Instance Support');
     console.log('🆔 Client ID:', CLIENT_ID);
 
-    // Check for placement div - REQUIRED for widget to display
-    const targetDiv = document.querySelector('[data-widget="smart-button"]');
-    if (!targetDiv) {
+    // Check for placement divs - REQUIRED for widget to display
+    const targetDivs = document.querySelectorAll('[data-widget="smart-button"]');
+    if (targetDivs.length === 0) {
       console.log('ℹ️ Smart Button Widget: No placement div found.');
       console.log('💡 Add <div data-widget="smart-button"></div> where you want the button to appear.');
       return;
     }
 
-    console.log('✅ Found placement div:', targetDiv);
-    state.targetDiv = targetDiv;
+    console.log(`✅ Found ${targetDivs.length} placement div(s)`);
+    state.targetDivs = Array.from(targetDivs);
 
     state.config = await fetchClientConfig();
 
