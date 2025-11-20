@@ -482,6 +482,8 @@
     const buttonColor = state.sessionButtonColor;
     const buttonText = state.sessionButtonText;
     const buttonTextColor = config.smart_button_text_color || '#FFFFFF';
+    const headlineTextColor = config.smart_button_headline_text_color || '#333333';
+    const transparentBg = config.smart_button_transparent_bg || false;
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
     // Use show_branding from database config (set based on subscription plan)
@@ -495,7 +497,7 @@
         font-size: 28px;
         font-weight: 700;
         line-height: 1.3;
-        color: #333;
+        color: ${headlineTextColor};
         font-family: inherit;
       ">
         ${variant.headline}
@@ -507,10 +509,10 @@
         max-width: 800px;
         margin: 20px auto;
         padding: 30px 40px;
-        background: ${bgColor};
-        border: 2px solid ${borderColor};
+        background: ${transparentBg ? 'transparent' : bgColor};
+        border: ${transparentBg ? 'none' : '2px solid ' + borderColor};
         border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        box-shadow: ${transparentBg ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.08)'};
         text-align: center;
         font-family: ${fontFamily};
         position: relative;
