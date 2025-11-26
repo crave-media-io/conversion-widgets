@@ -1,12 +1,19 @@
 /**
- * Widget Gateway Script v1.1
+ * Widget Gateway Script v1.2
  *
  * This is the ONLY script clients need to install.
  * It handles:
  * - Account status checking (active/suspended)
  * - Enabled widgets filtering
  * - Dynamic widget loading
- * - Suspension warnings
+ * - Suspension warnings (for admin-suspended accounts only)
+ * - Trial expiration (silent blocking - NO customer-facing messages)
+ *
+ * Changelog v1.2:
+ * - REMOVED: Trial expiration popup (was showing on client websites)
+ * - FIXED: Complimentary accounts now never blocked (respects is_complimentary field)
+ * - FIXED: Unlimited accounts now never blocked
+ * - IMPROVED: Trial expiration handling is now silent (no customer-facing messages)
  *
  * Usage (Recommended - works with GTM):
  * <script src="https://cdn.jsdelivr.net/gh/crave-media-io/conversion-widgets@main/widget-gateway.js?client-id=YOUR_CLIENT_ID"></script>
@@ -185,97 +192,6 @@
         console.log('[Widget Gateway] Suspension warning displayed');
     }
 
-    /**
-     * Show trial expired warning overlay
-     */
-    function showTrialExpiredWarning() {
-        // Check if warning already exists
-        if (document.getElementById('widget-trial-expired-warning')) {
-            return;
-        }
-
-        const warning = document.createElement('div');
-        warning.id = 'widget-trial-expired-warning';
-        warning.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
-            color: #333;
-            padding: 20px 24px;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(255, 193, 7, 0.4);
-            z-index: 999999;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            max-width: 400px;
-            animation: slideInTrial 0.3s ease-out;
-        `;
-
-        warning.innerHTML = `
-            <style>
-                @keyframes slideInTrial {
-                    from {
-                        transform: translateX(500px);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateX(0);
-                        opacity: 1;
-                    }
-                }
-                #widget-trial-expired-warning strong {
-                    display: block;
-                    font-size: 18px;
-                    margin-bottom: 8px;
-                    font-weight: 600;
-                }
-                #widget-trial-expired-warning p {
-                    margin: 0 0 12px 0;
-                    font-size: 14px;
-                    line-height: 1.5;
-                }
-                #widget-trial-close {
-                    position: absolute;
-                    top: 12px;
-                    right: 12px;
-                    background: rgba(0,0,0,0.1);
-                    border: none;
-                    color: #333;
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 50%;
-                    cursor: pointer;
-                    font-size: 16px;
-                    line-height: 1;
-                    transition: background 0.2s;
-                }
-                #widget-trial-close:hover {
-                    background: rgba(0,0,0,0.2);
-                }
-                .upgrade-btn {
-                    display: inline-block;
-                    padding: 10px 20px;
-                    background: #333;
-                    color: white;
-                    text-decoration: none;
-                    border-radius: 6px;
-                    font-weight: 600;
-                    font-size: 14px;
-                    transition: background 0.2s;
-                }
-                .upgrade-btn:hover {
-                    background: #000;
-                }
-            </style>
-            <button id="widget-trial-close" onclick="this.parentElement.remove()">×</button>
-            <strong>⏰ Free Trial Expired</strong>
-            <p>This website's conversion widgets are no longer active. The site owner needs to upgrade to continue using these features.</p>
-            <a href="https://www.cravemedia.io/client-dashboard/" class="upgrade-btn" target="_blank">Upgrade Now</a>
-        `;
-
-        document.body.appendChild(warning);
-        console.log('[Widget Gateway] Trial expired warning displayed');
-    }
 
     /**
      * Load a widget script dynamically
@@ -332,19 +248,48 @@
             return; // Don't load any widgets
         }
 
-        // Check trial expiration
+        // Check subscription and trial status
         const subscriptionStatus = client.subscription_status || 'trial';
+        const subscriptionPlan = client.subscription_plan || 'starter';
+        const isComplimentary = client.is_complimentary || false;
         const trialEndsAt = client.trial_ends_at ? new Date(client.trial_ends_at) : null;
         const now = new Date();
 
         console.log('[Widget Gateway] Subscription status:', subscriptionStatus);
+        console.log('[Widget Gateway] Subscription plan:', subscriptionPlan);
+        console.log('[Widget Gateway] Is complimentary:', isComplimentary);
         console.log('[Widget Gateway] Trial ends at:', trialEndsAt);
 
-        // Block widgets if trial expired or subscription explicitly expired
-        if (subscriptionStatus === 'expired' || (subscriptionStatus === 'trial' && trialEndsAt && trialEndsAt < now)) {
-            console.warn('[Widget Gateway] Trial/subscription expired. Showing expiration warning and blocking widgets.');
-            showTrialExpiredWarning();
-            return; // Don't load any widgets
+        // Determine if widgets should be blocked
+        // NEVER block complimentary accounts or unlimited plans
+        const isUnlimited = (subscriptionPlan === 'unlimited');
+        const isComplimentaryStatus = (subscriptionStatus === 'complimentary');
+
+        // Only block if:
+        // 1. Subscription explicitly expired (payment failed and account suspended by cron job)
+        // 2. Trial expired AND account is NOT complimentary AND NOT unlimited
+        const shouldBlock = (
+            subscriptionStatus === 'expired' &&
+            !isComplimentary &&
+            !isUnlimited &&
+            !isComplimentaryStatus
+        ) || (
+            subscriptionStatus === 'trial' &&
+            trialEndsAt &&
+            trialEndsAt < now &&
+            !isComplimentary &&
+            !isUnlimited &&
+            !isComplimentaryStatus
+        );
+
+        if (shouldBlock) {
+            console.warn('[Widget Gateway] Trial/subscription expired. Blocking widgets silently.');
+            return; // Don't load any widgets - NO popup or warning shown
+        }
+
+        // Log if account is complimentary or unlimited (for debugging)
+        if (isComplimentary || isUnlimited || isComplimentaryStatus) {
+            console.log('[Widget Gateway] Account is complimentary or unlimited - widgets will always load');
         }
 
         // Get enabled widgets
