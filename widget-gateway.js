@@ -1,13 +1,17 @@
 /**
- * Widget Gateway Script v1.2
+ * Widget Gateway Script v1.3
  *
  * This is the ONLY script clients need to install.
  * It handles:
- * - Account status checking (active/suspended)
+ * - Account status checking (active/suspended/canceled)
  * - Enabled widgets filtering
  * - Dynamic widget loading
- * - Suspension warnings (for admin-suspended accounts only)
- * - Trial expiration (silent blocking - NO customer-facing messages)
+ * - Silent blocking (NO customer-facing messages ever)
+ *
+ * Changelog v1.3:
+ * - REMOVED: Suspension/cancellation popup (was showing on client websites)
+ * - IMPROVED: All account issues now handled silently - widgets just don't load
+ * - NO customer-facing messages for ANY account status issues
  *
  * Changelog v1.2:
  * - REMOVED: Trial expiration popup (was showing on client websites)
@@ -114,83 +118,6 @@
         }
     }
 
-    /**
-     * Show suspension warning overlay
-     */
-    function showSuspensionWarning() {
-        // Check if warning already exists
-        if (document.getElementById('widget-suspension-warning')) {
-            return;
-        }
-
-        const warning = document.createElement('div');
-        warning.id = 'widget-suspension-warning';
-        warning.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-            color: white;
-            padding: 20px 24px;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(220, 53, 69, 0.4);
-            z-index: 999999;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            max-width: 400px;
-            animation: slideIn 0.3s ease-out;
-        `;
-
-        warning.innerHTML = `
-            <style>
-                @keyframes slideIn {
-                    from {
-                        transform: translateX(500px);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateX(0);
-                        opacity: 1;
-                    }
-                }
-                #widget-suspension-warning strong {
-                    display: block;
-                    font-size: 18px;
-                    margin-bottom: 8px;
-                    font-weight: 600;
-                }
-                #widget-suspension-warning p {
-                    margin: 0;
-                    font-size: 14px;
-                    line-height: 1.5;
-                    opacity: 0.95;
-                }
-                #widget-suspension-close {
-                    position: absolute;
-                    top: 12px;
-                    right: 12px;
-                    background: rgba(255,255,255,0.2);
-                    border: none;
-                    color: white;
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 50%;
-                    cursor: pointer;
-                    font-size: 16px;
-                    line-height: 1;
-                    transition: background 0.2s;
-                }
-                #widget-suspension-close:hover {
-                    background: rgba(255,255,255,0.3);
-                }
-            </style>
-            <button id="widget-suspension-close" onclick="this.parentElement.remove()">×</button>
-            <strong>⚠️ Service Suspended</strong>
-            <p>This website's conversion widgets are temporarily unavailable. Please contact the site owner for assistance.</p>
-        `;
-
-        document.body.appendChild(warning);
-        console.log('[Widget Gateway] Suspension warning displayed');
-    }
 
 
     /**
@@ -243,9 +170,8 @@
         console.log('[Widget Gateway] Site status:', status);
 
         if (status === 'suspended' || status === 'canceled') {
-            console.warn('[Widget Gateway] Site is suspended. Showing warning and blocking widgets.');
-            showSuspensionWarning();
-            return; // Don't load any widgets
+            console.warn('[Widget Gateway] Site is suspended or canceled. Blocking widgets silently.');
+            return; // Don't load any widgets - NO popup or warning shown
         }
 
         // Check subscription and trial status
