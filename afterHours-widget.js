@@ -355,6 +355,8 @@
     const popupMessage = config.after_hours_message || "We're currently closed. Book online instead!";
     const allowCall = config.after_hours_allow_call !== false; // default true
     const popupIcon = config.after_hours_popup_icon || '🌙'; // Use custom icon or default to moon
+    const popupButtonText = config.after_hours_popup_button_text || 'Book Online Now';
+    const popupButtonIcon = config.after_hours_popup_button_icon || '📅';
 
     // Use show_branding from database config (set based on subscription plan)
     // Pro, Premium, and Unlimited plans have show_branding=false
@@ -463,7 +465,7 @@
             font-family: inherit;
           " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.2)'"
              onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'">
-            📅 Book Online Now
+            ${popupButtonIcon} ${popupButtonText}
           </a>
 
           ${allowCall ? `
