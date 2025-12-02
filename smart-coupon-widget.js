@@ -1,0 +1,857 @@
+(function() {
+  'use strict';
+
+  // ============================================
+  // CONFIGURATION
+  // ============================================
+  const SUPABASE = {
+    url: 'https://dnsbirpaknvifkgbodqd.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuc2JpcnBha252aWZrZ2JvZHFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5MDI1MjUsImV4cCI6MjA3NTQ3ODUyNX0.0f_q15ZhmHI2gEpS53DyIeRnReF-KS4YYJ1PdetyYwQ'
+  };
+
+  // Get client ID from script tag
+  const scriptTag = document.currentScript || document.querySelector('script[data-client-id][src*="smart-coupon"]');
+  const CLIENT_ID = scriptTag ? scriptTag.getAttribute('data-client-id') : 'test_client_123';
+
+  // ============================================
+  // STATE MANAGEMENT
+  // ============================================
+  const state = {
+    config: null,
+    currentVariant: null,
+    currentIndex: 0,
+    rotationTimer: null,
+    offers: [],
+    sessionBackgroundColor: null,
+    sessionDesignStyle: null,
+    sessionButtonText: null,
+    headlinesEnabled: true,
+    targetDivs: [],
+    instances: []
+  };
+
+  // ============================================
+  // DOMAIN VALIDATION & WIDGET ENFORCEMENT
+  // ============================================
+  function checkDomainMatch(allowedDomain) {
+    if (!allowedDomain) return true;
+
+    const currentDomain = window.location.hostname.toLowerCase();
+    const cleanCurrent = currentDomain.replace(/^www\./, '');
+    const cleanAllowed = allowedDomain.toLowerCase().replace(/^www\./, '');
+
+    if (currentDomain === 'localhost' || currentDomain === '127.0.0.1') {
+      console.log('ℹ️ Localhost detected - allowing for development');
+      return true;
+    }
+
+    if (cleanCurrent !== cleanAllowed) {
+      console.warn(`🚫 Widget blocked: Domain mismatch. Expected ${cleanAllowed}, got ${cleanCurrent}`);
+      return false;
+    }
+
+    return true;
+  }
+
+  async function checkIfSiteActive(clientId) {
+    try {
+      const response = await fetch(
+        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${clientId}&select=status`,
+        {
+          headers: {
+            'apikey': SUPABASE.key,
+            'Authorization': `Bearer ${SUPABASE.key}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        console.warn('⚠️ Failed to check site status - allowing widget (fail open)');
+        return true;
+      }
+
+      const data = await response.json();
+      const status = data[0]?.status || 'active';
+
+      if (status === 'suspended') {
+        console.log('🚫 Site is suspended - upgrade your plan to reactivate');
+        return false;
+      }
+
+      return true;
+
+    } catch (error) {
+      console.warn('⚠️ Error checking site status:', error);
+      return true;
+    }
+  }
+
+  async function checkIfWidgetEnabled(widgetName, clientId) {
+    try {
+      const response = await fetch(
+        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${clientId}&select=enabled_widgets`,
+        {
+          headers: {
+            'apikey': SUPABASE.key,
+            'Authorization': `Bearer ${SUPABASE.key}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        console.warn('⚠️ Failed to check widget status - allowing widget (fail open)');
+        return true;
+      }
+
+      const data = await response.json();
+      const enabledWidgets = data[0]?.enabled_widgets || [];
+
+      if (!enabledWidgets.includes(widgetName)) {
+        console.log(`🚫 Widget "${widgetName}" not enabled for client ${clientId}`);
+        return false;
+      }
+
+      return true;
+
+    } catch (error) {
+      console.warn('⚠️ Error checking widget status:', error);
+      return true;
+    }
+  }
+
+  // ============================================
+  // FETCH CONFIG FROM SUPABASE
+  // ============================================
+  async function fetchClientConfig() {
+    try {
+      console.log('🎟️ Fetching Smart Coupons config for client:', CLIENT_ID);
+
+      const response = await fetch(
+        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}`,
+        {
+          headers: {
+            'apikey': SUPABASE.key,
+            'Authorization': `Bearer ${SUPABASE.key}`
+          }
+        }
+      );
+
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        const config = data[0];
+        console.log('✅ Smart Coupons config loaded:', config.business_name);
+        return config;
+      } else {
+        console.error('❌ No config found for client:', CLIENT_ID);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error fetching config:', error);
+      return null;
+    }
+  }
+
+  // ============================================
+  // FETCH COUPON OFFERS
+  // ============================================
+  async function fetchCouponOffers() {
+    try {
+      console.log('🎟️ Fetching coupon offers for client:', CLIENT_ID);
+
+      const response = await fetch(
+        `${SUPABASE.url}/rest/v1/coupon_offers?client_id=eq.${CLIENT_ID}&is_active=eq.true&order=offer_number.asc`,
+        {
+          headers: {
+            'apikey': SUPABASE.key,
+            'Authorization': `Bearer ${SUPABASE.key}`
+          }
+        }
+      );
+
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        console.log(`✅ Loaded ${data.length} coupon offers`);
+        return data;
+      } else {
+        console.warn('⚠️ No active coupon offers found');
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ Error fetching coupon offers:', error);
+      return [];
+    }
+  }
+
+  // ============================================
+  // SESSION-BASED VARIANT SELECTION
+  // ============================================
+  function selectSessionBackgroundColor(colors) {
+    const sessionKey = `smart_coupon_bg_${CLIENT_ID}`;
+    const cached = sessionStorage.getItem(sessionKey);
+
+    if (cached && colors.includes(cached)) {
+      console.log('📦 Using cached background color:', cached);
+      return cached;
+    }
+
+    const selected = colors[Math.floor(Math.random() * colors.length)];
+    sessionStorage.setItem(sessionKey, selected);
+    console.log('🎨 Selected background color for session:', selected);
+    return selected;
+  }
+
+  function selectSessionDesignStyle(styles) {
+    const sessionKey = `smart_coupon_style_${CLIENT_ID}`;
+    const cached = sessionStorage.getItem(sessionKey);
+
+    if (cached && styles.includes(cached)) {
+      console.log('📦 Using cached design style:', cached);
+      return cached;
+    }
+
+    const selected = styles[Math.floor(Math.random() * styles.length)];
+    sessionStorage.setItem(sessionKey, selected);
+    console.log('🎭 Selected design style for session:', selected);
+    return selected;
+  }
+
+  function selectSessionButtonText(buttonTexts) {
+    const sessionKey = `smart_coupon_button_${CLIENT_ID}`;
+    const cached = sessionStorage.getItem(sessionKey);
+
+    if (cached && buttonTexts.includes(cached)) {
+      console.log('📦 Using cached button text:', cached);
+      return cached;
+    }
+
+    const selected = buttonTexts[Math.floor(Math.random() * buttonTexts.length)];
+    sessionStorage.setItem(sessionKey, selected);
+    console.log('📝 Selected button text for session:', selected);
+    return selected;
+  }
+
+  // ============================================
+  // EXPIRATION DATE CALCULATION
+  // ============================================
+  function calculateExpirationDate(mode) {
+    if (mode === 'none') return null;
+
+    const now = new Date();
+    let expirationDate;
+
+    if (mode === 'rolling_7days') {
+      // Next Saturday (7 days cycle)
+      const daysUntilSaturday = (6 - now.getDay() + 7) % 7 || 7;
+      expirationDate = new Date(now);
+      expirationDate.setDate(now.getDate() + daysUntilSaturday);
+    } else if (mode === 'rolling_14days') {
+      // 14 days from today
+      expirationDate = new Date(now);
+      expirationDate.setDate(now.getDate() + 14);
+    }
+
+    // Format as "Expires Dec 15, 2025"
+    const options = { month: 'short', day: 'numeric', year: 'numeric' };
+    return 'Expires ' + expirationDate.toLocaleDateString('en-US', options);
+  }
+
+  // ============================================
+  // COLOR ADJUSTMENT HELPER (darkening for gradients)
+  // ============================================
+  function adjustColor(color, percent) {
+    const num = parseInt(color.replace("#",""), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = (num >> 16) + amt;
+    const G = (num >> 8 & 0x00FF) + amt;
+    const B = (num & 0x0000FF) + amt;
+    return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 +
+      (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255))
+      .toString(16).slice(1);
+  }
+
+  // ============================================
+  // ANALYTICS TRACKING
+  // ============================================
+  async function sendToSupabase(eventType, variant) {
+    try {
+      await fetch(`${SUPABASE.url}/rest/v1/coupon_performance`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE.key,
+          'Authorization': `Bearer ${SUPABASE.key}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          client_id: CLIENT_ID,
+          offer_number: variant.offer_number,
+          background_color: state.sessionBackgroundColor,
+          design_style: state.sessionDesignStyle,
+          headline: variant.headline,
+          button_text: state.sessionButtonText,
+          event_type: eventType,
+          page_url: window.location.pathname,
+          user_agent: navigator.userAgent
+        })
+      });
+    } catch (error) {
+      console.error('Error sending to Supabase:', error);
+    }
+  }
+
+  function trackImpression(variant) {
+    const rotationKey = `coupon_impression_${CLIENT_ID}_${variant.offer_number}_${state.currentIndex}`;
+
+    if (sessionStorage.getItem(rotationKey)) {
+      console.log('📊 Impression already tracked for this rotation');
+      return;
+    }
+
+    sessionStorage.setItem(rotationKey, 'true');
+    console.log('📊 Coupon impression:', variant.headline);
+    sendToSupabase('impression', variant);
+  }
+
+  function trackClick(variant) {
+    console.log('🎯 COUPON CLICK!', {
+      offer: variant.headline,
+      offerNumber: variant.offer_number,
+      style: state.sessionDesignStyle,
+      color: state.sessionBackgroundColor,
+      buttonText: state.sessionButtonText
+    });
+    sendToSupabase('click', variant);
+  }
+
+  // ============================================
+  // CREATE COUPON HTML (3 STYLES)
+  // ============================================
+  function createCouponHTML(variant, config, instanceIndex = 0) {
+    // Determine button link
+    let buttonLink;
+    if (config.smart_coupon_use_custom_url && config.smart_coupon_custom_url && config.smart_coupon_custom_url.trim()) {
+      let customUrl = config.smart_coupon_custom_url.trim();
+      if (!customUrl.match(/^https?:\/\//i) && !customUrl.startsWith('tel:') && !customUrl.startsWith('mailto:')) {
+        customUrl = 'https://' + customUrl;
+      }
+      buttonLink = customUrl;
+    } else {
+      buttonLink = config.button_type === 'call'
+        ? `tel:${config.phone_number.replace(/\D/g, '')}`
+        : config.booking_url;
+    }
+
+    const bgColor = state.sessionBackgroundColor;
+    const darkenedColor = adjustColor(bgColor, -20);
+    const style = state.sessionDesignStyle;
+    const buttonColor = config.smart_coupon_button_color || '#fed80e';
+    const buttonTextColor = config.smart_coupon_button_text_color || '#000000';
+    const headlineTextColor = config.smart_coupon_headline_text_color || '#ffffff';
+    const disclaimerTextColor = config.smart_coupon_disclaimer_text_color || '#ffffff';
+    const buttonText = state.sessionButtonText;
+    const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    const showBranding = config.show_branding !== false;
+
+    // Format discount display
+    const discountDisplay = variant.discount_type === 'percentage'
+      ? `${variant.discount_value}% OFF`
+      : `$${variant.discount_value} OFF`;
+
+    // Calculate expiration if enabled
+    const expirationText = calculateExpirationDate(variant.expiration_mode);
+    const expirationHTML = expirationText ? `
+      <p class="coupon-expiration" style="
+        font-size: 14px;
+        font-weight: 600;
+        margin-top: ${variant.expiration_display === 'below_headline' ? '15px' : '20px'};
+        opacity: 0.95;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      ">
+        ${expirationText}
+      </p>
+    ` : '';
+
+    // Style-specific HTML
+    let couponStyleHTML = '';
+
+    if (style === 'dashed') {
+      // Style 1: Dashed Border
+      couponStyleHTML = `
+        <div class="smart-coupon-widget" data-instance="${instanceIndex}" style="
+          max-width: 500px;
+          margin: 20px auto;
+          border: 6px dashed #ffffff;
+          border-radius: 25px;
+          background: linear-gradient(120deg, ${bgColor} 0%, ${darkenedColor} 100%);
+          box-shadow: 2px 2px 10px 2px rgba(0,0,0,0.3);
+          padding: 40px;
+          text-align: center;
+          color: ${headlineTextColor};
+          font-family: ${fontFamily};
+        ">
+          <h2 class="coupon-headline" style="
+            font-size: 30px;
+            font-weight: 700;
+            margin: 0 0 20px 0;
+            line-height: 1.2;
+            color: ${headlineTextColor};
+          ">
+            ${variant.headline}
+          </h2>
+          ${variant.expiration_display === 'below_headline' ? expirationHTML : ''}
+          <div class="coupon-discount" style="
+            font-size: 75px;
+            font-weight: 900;
+            margin: 20px 0;
+            line-height: 1;
+          ">
+            ${discountDisplay}
+          </div>
+          <a href="${buttonLink}" class="coupon-button" onclick="window.smartCouponClick && window.smartCouponClick()" style="
+            display: inline-block;
+            background: ${buttonColor};
+            color: ${buttonTextColor};
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 600;
+            text-decoration: none;
+            margin: 20px 0;
+            transition: all 0.3s;
+            cursor: pointer;
+          ">${buttonText}</a>
+          ${variant.disclaimer ? `
+            <p class="coupon-disclaimer" style="
+              font-size: 12px;
+              margin-top: 20px;
+              line-height: 1.4;
+              opacity: 0.95;
+              color: ${disclaimerTextColor};
+            ">
+              ${variant.disclaimer}
+            </p>
+          ` : ''}
+          ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
+        </div>
+      `;
+    } else if (style === 'ticket') {
+      // Style 2: Modern Ticket (perforated + hover lift)
+      couponStyleHTML = `
+        <div class="smart-coupon-widget smart-coupon-ticket" data-instance="${instanceIndex}" style="
+          max-width: 500px;
+          margin: 20px auto;
+          border: 3px solid #ffffff;
+          border-radius: 12px;
+          background: linear-gradient(135deg, ${bgColor} 0%, ${darkenedColor} 100%);
+          box-shadow: 0 8px 32px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1);
+          padding: 40px;
+          text-align: center;
+          color: ${headlineTextColor};
+          position: relative;
+          overflow: visible;
+          transition: transform 0.3s, box-shadow 0.3s;
+          cursor: pointer;
+          font-family: ${fontFamily};
+        ">
+          <style>
+            .smart-coupon-ticket:hover {
+              transform: translateY(-6px);
+              box-shadow: 0 12px 40px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.15);
+            }
+            .smart-coupon-ticket::before,
+            .smart-coupon-ticket::after {
+              content: '';
+              position: absolute;
+              top: -3px;
+              bottom: -3px;
+              width: 20px;
+            }
+            .smart-coupon-ticket::before {
+              left: -13px;
+              background:
+                radial-gradient(circle at 10px 0px, transparent 6px, #f5f5f5 6px) 0 0,
+                radial-gradient(circle at 10px 20px, transparent 6px, #f5f5f5 6px) 0 10px;
+              background-size: 20px 20px;
+              background-repeat: repeat-y;
+            }
+            .smart-coupon-ticket::after {
+              right: -13px;
+              background:
+                radial-gradient(circle at 10px 0px, transparent 6px, #f5f5f5 6px) 0 0,
+                radial-gradient(circle at 10px 20px, transparent 6px, #f5f5f5 6px) 0 10px;
+              background-size: 20px 20px;
+              background-repeat: repeat-y;
+            }
+          </style>
+          <h2 class="coupon-headline" style="
+            font-size: 30px;
+            font-weight: 700;
+            margin: 0 0 20px 0;
+            line-height: 1.2;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: ${headlineTextColor};
+          ">
+            ${variant.headline}
+          </h2>
+          ${variant.expiration_display === 'below_headline' ? expirationHTML : ''}
+          <div class="coupon-discount" style="
+            font-size: 75px;
+            font-weight: 900;
+            margin: 20px 0;
+            line-height: 1;
+            letter-spacing: -2px;
+          ">
+            ${discountDisplay}
+          </div>
+          <a href="${buttonLink}" class="coupon-button" onclick="window.smartCouponClick && window.smartCouponClick()" style="
+            display: inline-block;
+            background: #ffffff;
+            color: ${bgColor};
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 700;
+            text-decoration: none;
+            margin: 20px 0;
+            transition: all 0.3s;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          ">${buttonText}</a>
+          ${variant.disclaimer ? `
+            <p class="coupon-disclaimer" style="
+              font-size: 12px;
+              margin-top: 20px;
+              line-height: 1.4;
+              opacity: 0.95;
+              color: ${disclaimerTextColor};
+            ">
+              ${variant.disclaimer}
+            </p>
+          ` : ''}
+          ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
+        </div>
+      `;
+    } else if (style === 'badge') {
+      // Style 3: Elegant Badge (circular seal)
+      couponStyleHTML = `
+        <div class="smart-coupon-container" style="
+          max-width: 400px;
+          margin: 40px auto;
+          position: relative;
+          font-family: ${fontFamily};
+        ">
+          <div class="smart-coupon-widget smart-coupon-badge" data-instance="${instanceIndex}" style="
+            border: 4px solid #ffffff;
+            border-radius: 50%;
+            background: radial-gradient(circle, ${bgColor} 0%, ${darkenedColor} 100%);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3), inset 0 0 0 8px rgba(255,255,255,0.2);
+            padding: 50px 40px;
+            text-align: center;
+            color: ${headlineTextColor};
+            position: relative;
+            width: 320px;
+            height: 320px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 40px auto;
+          ">
+            <style>
+              .smart-coupon-badge::after {
+                content: 'LIMITED TIME';
+                position: absolute;
+                top: 30px;
+                right: -25px;
+                background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+                color: #000;
+                padding: 6px 25px;
+                font-size: 11px;
+                font-weight: 900;
+                transform: rotate(20deg);
+                box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                letter-spacing: 1px;
+                border: 2px solid #ffeb3b;
+              }
+            </style>
+            <div class="vip-badge" style="
+              position: absolute;
+              top: -10px;
+              left: 50%;
+              transform: translateX(-50%);
+              background: #ffd700;
+              color: #000;
+              padding: 4px 15px;
+              border-radius: 20px;
+              font-size: 10px;
+              font-weight: 900;
+              letter-spacing: 2px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            ">VIP OFFER</div>
+            <h2 class="coupon-headline" style="
+              font-size: 24px;
+              font-weight: 700;
+              margin: 0 0 15px 0;
+              line-height: 1.2;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              color: ${headlineTextColor};
+            ">
+              ${variant.headline}
+            </h2>
+            ${variant.expiration_display === 'below_headline' ? expirationHTML : ''}
+            <div class="coupon-discount" style="
+              font-size: 65px;
+              font-weight: 900;
+              margin: 15px 0;
+              line-height: 1;
+              text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            ">
+              ${discountDisplay}
+            </div>
+            <a href="${buttonLink}" class="coupon-button" onclick="window.smartCouponClick && window.smartCouponClick()" style="
+              display: inline-block;
+              background: #ffd700;
+              color: #000000;
+              padding: 12px 35px;
+              border-radius: 50px;
+              font-size: 16px;
+              font-weight: 700;
+              text-decoration: none;
+              margin: 15px 0;
+              transition: all 0.3s;
+              cursor: pointer;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            ">${buttonText}</a>
+            ${variant.disclaimer ? `
+              <p class="coupon-disclaimer" style="
+                font-size: 10px;
+                margin-top: 15px;
+                line-height: 1.3;
+                opacity: 0.9;
+                max-width: 250px;
+                color: ${disclaimerTextColor};
+              ">
+                ${variant.disclaimer}
+              </p>
+            ` : ''}
+            ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    // Add branding if enabled
+    const brandingHTML = showBranding ? `
+      <div class="smart-coupon-branding" style="
+        text-align: center;
+        margin-top: 15px;
+        font-size: 11px;
+        color: #999;
+        font-family: ${fontFamily};
+      ">
+        Powered by <a href="https://www.cravemedia.io" target="_blank" style="color: #667eea; text-decoration: none;">Conversion Widgets</a>
+      </div>
+    ` : '';
+
+    return couponStyleHTML + brandingHTML;
+  }
+
+  // ============================================
+  // RENDER COUPON IN TARGET DIVS
+  // ============================================
+  function renderCoupon(variant) {
+    // Find all divs where coupon should be embedded
+    state.targetDivs = document.querySelectorAll('div[data-coupon-widget]');
+
+    if (state.targetDivs.length === 0) {
+      console.warn('⚠️ No <div data-coupon-widget></div> found on page');
+      return;
+    }
+
+    console.log(`🎟️ Rendering coupon in ${state.targetDivs.length} location(s)`);
+
+    // Clear existing instances
+    state.instances.forEach(instance => {
+      if (instance && instance.parentNode) {
+        instance.parentNode.removeChild(instance);
+      }
+    });
+    state.instances = [];
+
+    // Render in each target div
+    state.targetDivs.forEach((targetDiv, index) => {
+      const html = createCouponHTML(variant, state.config, index);
+      targetDiv.innerHTML = html;
+
+      // Store reference to rendered instance
+      const instance = targetDiv.querySelector('.smart-coupon-widget');
+      if (instance) {
+        state.instances.push(instance);
+      }
+    });
+
+    // Track impression (once per rotation, not per instance)
+    trackImpression(variant);
+
+    // Setup click tracking
+    window.smartCouponClick = function() {
+      trackClick(variant);
+    };
+  }
+
+  // ============================================
+  // VARIANT CREATION & ROTATION
+  // ============================================
+  function createVariantsFromOffers(offers) {
+    return offers.map(offer => ({
+      offer_number: offer.offer_number,
+      headline: offer.headline,
+      discount_type: offer.discount_type,
+      discount_value: offer.discount_value,
+      button_text: offer.button_text,
+      disclaimer: offer.disclaimer,
+      expiration_mode: offer.expiration_mode,
+      expiration_display: offer.expiration_display
+    }));
+  }
+
+  function startRotation(variants) {
+    const ROTATION_INTERVAL = 30000; // 30 seconds
+
+    if (state.rotationTimer) {
+      clearInterval(state.rotationTimer);
+    }
+
+    state.rotationTimer = setInterval(() => {
+      state.currentIndex = (state.currentIndex + 1) % variants.length;
+      const nextVariant = variants[state.currentIndex];
+      console.log('🔄 Rotating to offer:', nextVariant.headline);
+      renderCoupon(nextVariant);
+    }, ROTATION_INTERVAL);
+  }
+
+  // ============================================
+  // INITIALIZATION
+  // ============================================
+  async function init() {
+    try {
+      console.log('🎟️ Smart Coupons Widget initializing...');
+      console.log('📍 Client ID:', CLIENT_ID);
+
+      // Fetch config
+      state.config = await fetchClientConfig();
+      if (!state.config) {
+        console.error('❌ Cannot load widget: No configuration found');
+        return;
+      }
+
+      // Check domain match
+      if (state.config.domain && !checkDomainMatch(state.config.domain)) {
+        console.error('❌ Domain validation failed');
+        return;
+      }
+
+      // Check if site is active
+      const siteActive = await checkIfSiteActive(CLIENT_ID);
+      if (!siteActive) {
+        console.error('❌ Site is suspended');
+        return;
+      }
+
+      // Check if widget is enabled
+      const widgetEnabled = await checkIfWidgetEnabled('smart_coupon', CLIENT_ID);
+      if (!widgetEnabled) {
+        console.error('❌ Smart Coupons widget is not enabled');
+        return;
+      }
+
+      // Fetch coupon offers
+      state.offers = await fetchCouponOffers();
+      if (state.offers.length === 0) {
+        console.warn('⚠️ No active coupon offers found - widget will not display');
+        return;
+      }
+
+      // Parse JSONB columns
+      let backgroundColors = state.config.smart_coupon_background_colors || ['#008b45', '#d32f2f', '#1976d2'];
+      let designStyles = state.config.smart_coupon_design_styles || ['dashed', 'ticket', 'badge'];
+      let buttonTexts = state.config.smart_coupon_button_texts || ['Schedule Now', 'Get Offer', 'Claim Discount'];
+
+      if (typeof backgroundColors === 'string') {
+        try {
+          backgroundColors = JSON.parse(backgroundColors);
+        } catch (e) {
+          backgroundColors = ['#008b45'];
+        }
+      }
+      if (typeof designStyles === 'string') {
+        try {
+          designStyles = JSON.parse(designStyles);
+        } catch (e) {
+          designStyles = ['dashed'];
+        }
+      }
+      if (typeof buttonTexts === 'string') {
+        try {
+          buttonTexts = JSON.parse(buttonTexts);
+        } catch (e) {
+          buttonTexts = ['Schedule Now'];
+        }
+      }
+
+      // Select session-consistent variants
+      state.sessionBackgroundColor = selectSessionBackgroundColor(backgroundColors);
+      state.sessionDesignStyle = selectSessionDesignStyle(designStyles);
+      state.sessionButtonText = selectSessionButtonText(buttonTexts);
+
+      console.log('🎨 Background Color:', state.sessionBackgroundColor);
+      console.log('🎭 Design Style:', state.sessionDesignStyle);
+      console.log('📝 Button Text:', state.sessionButtonText);
+
+      // Create variants and render first one
+      const variants = createVariantsFromOffers(state.offers);
+      const selectedVariant = variants[0]; // Start with first offer
+
+      renderCoupon(selectedVariant);
+
+      // Start rotation if multiple offers
+      if (variants.length > 1) {
+        console.log('🔄 Starting offer rotation');
+        startRotation(variants);
+      }
+
+      console.log('✅ Smart Coupons Widget ready!');
+
+      // Expose utility functions
+      window.clearSmartCouponData = function() {
+        sessionStorage.removeItem(`smart_coupon_bg_${CLIENT_ID}`);
+        sessionStorage.removeItem(`smart_coupon_style_${CLIENT_ID}`);
+        sessionStorage.removeItem(`smart_coupon_button_${CLIENT_ID}`);
+        console.log('✨ Smart Coupon data cleared!');
+        location.reload();
+      };
+
+    } catch (error) {
+      console.error('❌ Smart Coupons Widget initialization error:', error);
+    }
+  }
+
+  // ============================================
+  // START
+  // ============================================
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+})();
