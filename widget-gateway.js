@@ -1,5 +1,5 @@
 /**
- * Widget Gateway Script v1.3
+ * Widget Gateway Script v1.4
  *
  * This is the ONLY script clients need to install.
  * It handles:
@@ -7,6 +7,9 @@
  * - Enabled widgets filtering
  * - Dynamic widget loading
  * - Silent blocking (NO customer-facing messages ever)
+ *
+ * Changelog v1.4:
+ * - ADDED: Smart Coupons widget support (4th widget type)
  *
  * Changelog v1.3:
  * - REMOVED: Suspension/cancellation popup (was showing on client websites)
@@ -37,7 +40,8 @@
     const WIDGET_SCRIPTS = {
         sidebar: 'https://cdn.jsdelivr.net/gh/crave-media-io/conversion-widgets@main/sidebar-widget.js',
         smart_button: 'https://cdn.jsdelivr.net/gh/crave-media-io/conversion-widgets@main/smart-button-widget.js',
-        after_hours: 'https://cdn.jsdelivr.net/gh/crave-media-io/conversion-widgets@main/afterHours-widget.js'
+        after_hours: 'https://cdn.jsdelivr.net/gh/crave-media-io/conversion-widgets@main/afterHours-widget.js',
+        smart_coupon: 'https://cdn.jsdelivr.net/gh/crave-media-io/conversion-widgets@main/smart-coupon-widget.js'
     };
 
     /**
