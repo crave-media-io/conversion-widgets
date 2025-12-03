@@ -22,6 +22,9 @@
     currentIndex: 0,
     rotationTimer: null,
     offers: [],
+    headlines: null,
+    currentHeadlineIndex: 0,
+    headlineRotationTimer: null,
     sessionBackgroundColor: null,
     sessionDesignStyle: null,
     sessionButtonText: null,
@@ -185,6 +188,120 @@
   }
 
   // ============================================
+  // FETCH HEADLINES FROM PAGE_HEADLINES TABLE
+  // ============================================
+  async function fetchHeadlines(config) {
+    // Check if headlines are enabled
+    if (!config.smart_coupon_headlines_enabled) {
+      console.log('📋 Headlines disabled for Smart Coupons');
+      return null;
+    }
+
+    const currentPath = window.location.pathname;
+    const cacheKey = `smart_coupon_headlines_${CLIENT_ID}_${currentPath}`;
+
+    // Check cache
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      console.log('📦 Using cached headlines');
+      const cachedData = JSON.parse(cached);
+      state.canonicalPageUrl = cachedData.canonicalPageUrl || currentPath;
+      return cachedData.headlines;
+    }
+
+    try {
+      console.log('📋 Loading headlines for page:', currentPath);
+
+      // First, try exact match
+      let response = await fetch(
+        `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}&page_url=eq.${encodeURIComponent(currentPath)}`,
+        {
+          headers: {
+            'apikey': SUPABASE.key,
+            'Authorization': `Bearer ${SUPABASE.key}`
+          }
+        }
+      );
+
+      let data = await response.json();
+
+      // If no exact match, check additional_urls
+      if (!data || data.length === 0) {
+        console.log('🔍 No exact match, checking additional URLs...');
+
+        // Fetch all pages for this client
+        response = await fetch(
+          `${SUPABASE.url}/rest/v1/page_headlines?client_id=eq.${CLIENT_ID}`,
+          {
+            headers: {
+              'apikey': SUPABASE.key,
+              'Authorization': `Bearer ${SUPABASE.key}`
+            }
+          }
+        );
+
+        const allPages = await response.json();
+
+        // Check each page's additional_urls for a match
+        for (let i = 0; i < allPages.length; i++) {
+          const page = allPages[i];
+          let additionalUrls = page.additional_urls || [];
+
+          // Handle string parsing if needed
+          if (typeof additionalUrls === 'string') {
+            try {
+              additionalUrls = JSON.parse(additionalUrls);
+            } catch (e) {
+              additionalUrls = [];
+            }
+          }
+
+          if (!Array.isArray(additionalUrls)) additionalUrls = [];
+
+          // Check for wildcard matches
+          for (let j = 0; j < additionalUrls.length; j++) {
+            const urlPattern = additionalUrls[j];
+            let isMatch = false;
+
+            if (urlPattern.includes('*')) {
+              // Simple wildcard matching
+              const pattern = urlPattern.replace(/\*/g, '.*');
+              const regex = new RegExp('^' + pattern + '$');
+              isMatch = regex.test(currentPath);
+            } else {
+              isMatch = currentPath === urlPattern;
+            }
+
+            if (isMatch) {
+              console.log('✅ Found match via additional_urls:', page.page_url);
+              state.canonicalPageUrl = page.page_url;
+              const result = { headlines: page.headlines, canonicalPageUrl: page.page_url };
+              sessionStorage.setItem(cacheKey, JSON.stringify(result));
+              return page.headlines;
+            }
+          }
+        }
+      } else {
+        // Exact match found
+        console.log('✅ Page-specific headlines loaded:', data[0].headlines);
+        state.canonicalPageUrl = data[0].page_url;
+        const result = { headlines: data[0].headlines, canonicalPageUrl: data[0].page_url };
+        sessionStorage.setItem(cacheKey, JSON.stringify(result));
+        return data[0].headlines;
+      }
+
+      // No match found
+      console.log('📝 No page-specific headlines found');
+      state.canonicalPageUrl = currentPath;
+      return null;
+    } catch (error) {
+      console.error('❌ Error loading headlines:', error);
+      state.canonicalPageUrl = currentPath;
+      return null;
+    }
+  }
+
+  // ============================================
   // SESSION-BASED VARIANT SELECTION
   // ============================================
   function selectSessionBackgroundColor(colors) {
@@ -328,6 +445,16 @@
   // ============================================
   // CREATE COUPON HTML (3 STYLES)
   // ============================================
+  // ============================================
+  // GET CURRENT ROTATING HEADLINE
+  // ============================================
+  function getCurrentHeadline() {
+    if (!state.headlines || state.headlines.length === 0) {
+      return null;
+    }
+    return state.headlines[state.currentHeadlineIndex];
+  }
+
   function createCouponHTML(variant, config, instanceIndex = 0) {
     // Determine button link
     let buttonLink;
@@ -363,9 +490,14 @@
     const showBranding = config.show_branding !== false;
 
     // Format discount display
-    const discountDisplay = variant.discount_type === 'percentage'
-      ? `${variant.discount_value}% OFF`
-      : `$${variant.discount_value} OFF`;
+    let discountDisplay;
+    if (variant.discount_type === 'percentage') {
+      discountDisplay = `${variant.discount_value}% OFF`;
+    } else if (variant.discount_type === 'none') {
+      discountDisplay = `$${variant.discount_value}`;  // Price only, no "OFF"
+    } else {
+      discountDisplay = `$${variant.discount_value} OFF`;
+    }
 
     // Calculate expiration if enabled
     const expirationText = calculateExpirationDate(variant.expiration_mode);
@@ -382,12 +514,36 @@
       </p>
     ` : '';
 
+    // Get rotating headline (if enabled)
+    const rotatingHeadline = getCurrentHeadline();
+    const headlineColorForRotating = config.smart_coupon_headline_text_color || '#333333';
+
+    // Headline HTML (outside coupon, like Smart Button)
+    const headlineHTML = rotatingHeadline ? `
+      <div class="rotating-headline" style="
+        margin: 0 0 20px 0;
+        text-align: center;
+        font-family: ${fontFamily};
+      ">
+        <h2 style="
+          font-size: 28px;
+          font-weight: 700;
+          line-height: 1.3;
+          color: ${headlineColorForRotating};
+          margin: 0;
+        ">
+          ${rotatingHeadline}
+        </h2>
+      </div>
+    ` : '';
+
     // Style-specific HTML
     let couponStyleHTML = '';
 
     if (style === 'dashed') {
       // Style 1: Dashed Border
       couponStyleHTML = `
+        ${headlineHTML}
         <div class="smart-coupon-widget" data-instance="${instanceIndex}" style="
           max-width: 500px;
           margin: 20px auto;
@@ -448,6 +604,7 @@
     } else if (style === 'ticket') {
       // Style 2: Modern Ticket (clean border + hover lift)
       couponStyleHTML = `
+        ${headlineHTML}
         <div class="smart-coupon-widget smart-coupon-ticket" data-instance="${instanceIndex}" style="
           max-width: 500px;
           margin: 20px auto;
@@ -524,6 +681,7 @@
     } else if (style === 'badge') {
       // Style 3: Elegant Badge (circular seal)
       couponStyleHTML = `
+        ${headlineHTML}
         <div class="smart-coupon-container" style="
           max-width: 400px;
           margin: 40px auto;
@@ -651,6 +809,9 @@
   // RENDER COUPON IN TARGET DIVS
   // ============================================
   function renderCoupon(variant) {
+    // Store current variant for headline rotation
+    state.currentVariant = variant;
+
     // Find all divs where coupon should be embedded
     state.targetDivs = document.querySelectorAll('div[data-coupon-widget]');
 
@@ -706,6 +867,34 @@
     }));
   }
 
+  // ============================================
+  // HEADLINE ROTATION
+  // ============================================
+  function startHeadlineRotation() {
+    if (!state.headlines || state.headlines.length <= 1) {
+      return; // No need to rotate if 0 or 1 headline
+    }
+
+    const HEADLINE_ROTATION_INTERVAL = 8000; // 8 seconds
+
+    if (state.headlineRotationTimer) {
+      clearInterval(state.headlineRotationTimer);
+    }
+
+    state.headlineRotationTimer = setInterval(() => {
+      state.currentHeadlineIndex = (state.currentHeadlineIndex + 1) % state.headlines.length;
+      console.log('📋 Rotating headline:', state.headlines[state.currentHeadlineIndex]);
+
+      // Re-render current coupon to update headline
+      if (state.currentVariant) {
+        renderCoupon(state.currentVariant);
+      }
+    }, HEADLINE_ROTATION_INTERVAL);
+  }
+
+  // ============================================
+  // OFFER ROTATION
+  // ============================================
   function startRotation(variants) {
     const ROTATION_INTERVAL = 30000; // 30 seconds
 
@@ -763,6 +952,12 @@
         return;
       }
 
+      // Fetch headlines (if enabled)
+      state.headlines = await fetchHeadlines(state.config);
+      if (state.headlines && state.headlines.length > 0) {
+        console.log(`📋 Loaded ${state.headlines.length} headlines for rotation`);
+      }
+
       // Parse JSONB columns
       let backgroundColors = state.config.smart_coupon_background_colors || ['#008b45', '#d32f2f', '#1976d2'];
       let designStyles = state.config.smart_coupon_design_styles || ['dashed', 'ticket', 'badge'];
@@ -809,6 +1004,12 @@
       if (variants.length > 1) {
         console.log('🔄 Starting offer rotation');
         startRotation(variants);
+      }
+
+      // Start headline rotation if multiple headlines
+      if (state.headlines && state.headlines.length > 1) {
+        console.log('📋 Starting headline rotation');
+        startHeadlineRotation();
       }
 
       console.log('✅ Smart Coupons Widget ready!');
