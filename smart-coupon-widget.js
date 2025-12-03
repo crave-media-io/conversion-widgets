@@ -350,6 +350,14 @@
     const buttonTextColor = config.smart_coupon_button_text_color || '#000000';
     const headlineTextColor = config.smart_coupon_headline_text_color || '#ffffff';
     const disclaimerTextColor = config.smart_coupon_disclaimer_text_color || '#ffffff';
+
+    // Get ribbon text for Elegant Badge style
+    let ribbonText = config.smart_coupon_badge_ribbon_text || 'LIMITED TIME';
+    if (ribbonText === 'custom') {
+      ribbonText = config.smart_coupon_badge_ribbon_custom || 'LIMITED';
+    } else if (ribbonText === 'none') {
+      ribbonText = ''; // No ribbon
+    }
     const buttonText = state.sessionButtonText;
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
     const showBranding = config.show_branding !== false;
@@ -563,23 +571,21 @@
             align-items: center;
             margin: 40px auto;
           ">
-            <style>
-              .smart-coupon-badge::after {
-                content: 'LIMITED TIME';
-                position: absolute;
-                top: 30px;
-                right: -25px;
-                background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-                color: #000;
-                padding: 6px 25px;
-                font-size: 11px;
-                font-weight: 900;
-                transform: rotate(20deg);
-                box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-                letter-spacing: 1px;
-                border: 2px solid #ffeb3b;
-              }
-            </style>
+            ${ribbonText ? `<div class="smart-coupon-ribbon" style="
+              position: absolute;
+              top: 30px;
+              right: -25px;
+              background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+              color: #000;
+              padding: 6px 25px;
+              font-size: 11px;
+              font-weight: 900;
+              transform: rotate(20deg);
+              box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+              letter-spacing: 1px;
+              border: 2px solid #ffeb3b;
+              white-space: nowrap;
+            ">${ribbonText}</div>` : ''}
             <div class="vip-badge" style="
               position: absolute;
               top: -10px;
