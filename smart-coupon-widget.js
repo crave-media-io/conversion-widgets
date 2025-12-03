@@ -163,7 +163,7 @@
       console.log('🎟️ Fetching coupon offers for client:', CLIENT_ID);
 
       const response = await fetch(
-        `${SUPABASE.url}/rest/v1/coupon_offers?client_id=eq.${CLIENT_ID}&is_active=eq.true&order=offer_number.asc`,
+        `${SUPABASE.url}/rest/v1/coupon_offers?client_id=eq.${CLIENT_ID}&order=offer_number.asc`,
         {
           headers: {
             'apikey': SUPABASE.key,
