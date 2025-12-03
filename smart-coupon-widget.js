@@ -446,12 +446,12 @@
         </div>
       `;
     } else if (style === 'ticket') {
-      // Style 2: Modern Ticket (perforated + hover lift)
+      // Style 2: Modern Ticket (clean border + hover lift)
       couponStyleHTML = `
         <div class="smart-coupon-widget smart-coupon-ticket" data-instance="${instanceIndex}" style="
           max-width: 500px;
           margin: 20px auto;
-          border: 3px solid #ffffff;
+          border: 4px solid #ffffff;
           border-radius: 12px;
           background: linear-gradient(135deg, ${bgColor} 0%, ${darkenedColor} 100%);
           box-shadow: 0 8px 32px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1);
@@ -468,30 +468,6 @@
             .smart-coupon-ticket:hover {
               transform: translateY(-6px);
               box-shadow: 0 12px 40px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.15);
-            }
-            .smart-coupon-ticket::before,
-            .smart-coupon-ticket::after {
-              content: '';
-              position: absolute;
-              top: -3px;
-              bottom: -3px;
-              width: 20px;
-            }
-            .smart-coupon-ticket::before {
-              left: -13px;
-              background:
-                radial-gradient(circle at 10px 0px, transparent 6px, #f5f5f5 6px) 0 0,
-                radial-gradient(circle at 10px 20px, transparent 6px, #f5f5f5 6px) 0 10px;
-              background-size: 20px 20px;
-              background-repeat: repeat-y;
-            }
-            .smart-coupon-ticket::after {
-              right: -13px;
-              background:
-                radial-gradient(circle at 10px 0px, transparent 6px, #f5f5f5 6px) 0 0,
-                radial-gradient(circle at 10px 20px, transparent 6px, #f5f5f5 6px) 0 10px;
-              background-size: 20px 20px;
-              background-repeat: repeat-y;
             }
           </style>
           <h2 class="coupon-headline" style="
