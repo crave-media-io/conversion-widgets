@@ -163,7 +163,7 @@
       console.log('🎟️ Fetching coupon offers for client:', CLIENT_ID);
 
       const response = await fetch(
-        `${SUPABASE.url}/rest/v1/coupon_offers?client_id=eq.${CLIENT_ID}&order=offer_number.asc`,
+        `${SUPABASE.url}/rest/v1/coupon_offers?client_id=eq.${CLIENT_ID}&is_active=eq.true&order=offer_number.asc`,
         {
           headers: {
             'apikey': SUPABASE.key,
@@ -173,6 +173,8 @@
       );
 
       const data = await response.json();
+
+      console.log('🔍 Raw coupon offers response:', data);
 
       if (data && data.length > 0) {
         console.log(`✅ Loaded ${data.length} coupon offers`);
@@ -650,8 +652,8 @@
           </div>
           <a href="${buttonLink}" class="coupon-button" onclick="window.smartCouponClick && window.smartCouponClick()" style="
             display: inline-block;
-            background: #ffffff;
-            color: ${bgColor};
+            background: ${buttonColor};
+            color: ${buttonTextColor};
             padding: 15px 40px;
             border-radius: 50px;
             font-size: 18px;
@@ -693,12 +695,12 @@
             border-radius: 50%;
             background: radial-gradient(circle, ${bgColor} 0%, ${darkenedColor} 100%);
             box-shadow: 0 4px 20px rgba(0,0,0,0.3), inset 0 0 0 8px rgba(255,255,255,0.2);
-            padding: 50px 40px;
+            padding: 55px 45px;
             text-align: center;
             color: ${headlineTextColor};
             position: relative;
-            width: 320px;
-            height: 320px;
+            width: 340px;
+            height: 340px;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -707,64 +709,64 @@
           ">
             ${ribbonText ? `<div class="smart-coupon-ribbon" style="
               position: absolute;
-              top: 30px;
-              right: -25px;
+              top: 35px;
+              right: -28px;
               background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
               color: #000;
-              padding: 6px 25px;
-              font-size: 11px;
+              padding: 7px 28px;
+              font-size: 12px;
               font-weight: 900;
               transform: rotate(20deg);
               box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-              letter-spacing: 1px;
+              letter-spacing: 1.2px;
               border: 2px solid #ffeb3b;
               white-space: nowrap;
             ">${ribbonText}</div>` : ''}
             <div class="vip-badge" style="
               position: absolute;
-              top: -10px;
+              top: -12px;
               left: 50%;
               transform: translateX(-50%);
               background: #ffd700;
               color: #000;
-              padding: 4px 15px;
-              border-radius: 20px;
-              font-size: 10px;
+              padding: 5px 18px;
+              border-radius: 22px;
+              font-size: 11px;
               font-weight: 900;
-              letter-spacing: 2px;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+              letter-spacing: 2.5px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.25);
             ">VIP OFFER</div>
             <h2 class="coupon-headline" style="
-              font-size: 24px;
+              font-size: 22px;
               font-weight: 700;
-              margin: 0 0 15px 0;
+              margin: 0 0 10px 0;
               line-height: 1.2;
               text-transform: uppercase;
-              letter-spacing: 1px;
+              letter-spacing: 0.5px;
               color: ${headlineTextColor};
             ">
               ${variant.headline}
             </h2>
             ${variant.expiration_display === 'below_headline' ? expirationHTML : ''}
             <div class="coupon-discount" style="
-              font-size: 65px;
+              font-size: 80px;
               font-weight: 900;
-              margin: 15px 0;
-              line-height: 1;
+              margin: 8px 0;
+              line-height: 0.95;
               text-shadow: 0 2px 8px rgba(0,0,0,0.3);
             ">
               ${discountDisplay}
             </div>
             <a href="${buttonLink}" class="coupon-button" onclick="window.smartCouponClick && window.smartCouponClick()" style="
               display: inline-block;
-              background: #ffd700;
-              color: #000000;
-              padding: 12px 35px;
+              background: ${buttonColor};
+              color: ${buttonTextColor};
+              padding: 14px 42px;
               border-radius: 50px;
-              font-size: 16px;
+              font-size: 18px;
               font-weight: 700;
               text-decoration: none;
-              margin: 15px 0;
+              margin: 10px 0 8px 0;
               transition: all 0.3s;
               cursor: pointer;
               text-transform: uppercase;
@@ -773,11 +775,11 @@
             ">${buttonText}</a>
             ${variant.disclaimer ? `
               <p class="coupon-disclaimer" style="
-                font-size: 10px;
-                margin-top: 15px;
+                font-size: 11px;
+                margin-top: 10px;
                 line-height: 1.3;
-                opacity: 0.9;
-                max-width: 250px;
+                opacity: 0.92;
+                max-width: 260px;
                 color: ${disclaimerTextColor};
               ">
                 ${variant.disclaimer}
@@ -987,12 +989,31 @@
 
       // Select session-consistent variants
       state.sessionBackgroundColor = selectSessionBackgroundColor(backgroundColors);
-      state.sessionDesignStyle = selectSessionDesignStyle(designStyles);
-      state.sessionButtonText = selectSessionButtonText(buttonTexts);
+
+      // Check if style rotation is enabled (default: false for backward compatibility)
+      const allowStyleRotation = state.config.smart_coupon_allow_style_rotation || false;
+
+      if (allowStyleRotation && designStyles.length > 1) {
+        state.sessionDesignStyle = selectSessionDesignStyle(designStyles);
+        console.log('🔄 Design style rotation enabled - using:', state.sessionDesignStyle);
+      } else {
+        state.sessionDesignStyle = designStyles[0] || 'dashed';
+        console.log('🎭 Design style rotation disabled - using first option:', state.sessionDesignStyle);
+      }
+
+      // Check if button text rotation is enabled (default: false for backward compatibility)
+      const allowButtonRotation = state.config.smart_coupon_allow_button_rotation || false;
+
+      if (allowButtonRotation && buttonTexts.length > 1) {
+        state.sessionButtonText = selectSessionButtonText(buttonTexts);
+        console.log('🔄 Button text rotation enabled - using:', state.sessionButtonText);
+      } else {
+        state.sessionButtonText = buttonTexts[0] || 'Schedule Now';
+        console.log('📝 Button text rotation disabled - using first option:', state.sessionButtonText);
+      }
 
       console.log('🎨 Background Color:', state.sessionBackgroundColor);
       console.log('🎭 Design Style:', state.sessionDesignStyle);
-      console.log('📝 Button Text:', state.sessionButtonText);
 
       // Create variants and render first one
       const variants = createVariantsFromOffers(state.offers);
