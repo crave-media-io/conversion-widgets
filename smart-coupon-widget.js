@@ -477,7 +477,7 @@
     const style = state.sessionDesignStyle;
     const buttonColor = config.smart_coupon_button_color || '#fed80e';
     const buttonTextColor = config.smart_coupon_button_text_color || '#000000';
-    const headlineTextColor = config.smart_coupon_headline_text_color || '#ffffff';
+    const headlineTextColor = config.smart_coupon_offer_text_color || '#ffffff';
     const disclaimerTextColor = config.smart_coupon_disclaimer_text_color || '#ffffff';
 
     // Get ribbon text for Elegant Badge style
@@ -486,6 +486,14 @@
       ribbonText = config.smart_coupon_badge_ribbon_custom || 'LIMITED';
     } else if (ribbonText === 'none') {
       ribbonText = ''; // No ribbon
+    }
+
+    // Get VIP badge text for Elegant Badge style
+    let vipBadgeText = config.smart_coupon_vip_badge_text || 'VIP OFFER';
+    if (vipBadgeText === 'custom') {
+      vipBadgeText = config.smart_coupon_vip_badge_custom || 'VIP OFFER';
+    } else if (vipBadgeText === 'none') {
+      vipBadgeText = ''; // No VIP badge
     }
     const buttonText = state.sessionButtonText;
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
@@ -505,7 +513,7 @@
     const expirationText = calculateExpirationDate(variant.expiration_mode);
     const expirationHTML = expirationText ? `
       <p class="coupon-expiration" style="
-        font-size: 14px;
+        font-size: 12px;
         font-weight: 600;
         margin-top: ${variant.expiration_display === 'below_headline' ? '15px' : '20px'};
         opacity: 0.95;
@@ -523,7 +531,7 @@
     // Headline HTML (outside coupon, like Smart Button)
     const headlineHTML = rotatingHeadline ? `
       <div class="rotating-headline" style="
-        margin: 0 0 20px 0;
+        margin: 0 0 35px 0;
         text-align: center;
         font-family: ${fontFamily};
       ">
@@ -538,6 +546,28 @@
         </h2>
       </div>
     ` : '';
+
+    // Adaptive font sizing for Elegant Badge (based on content length)
+    let badgeHeadlineFontSize = 22; // Default
+    let badgeDiscountFontSize = 65; // Default
+
+    if (style === 'badge') {
+      // Adjust headline font size based on length
+      const headlineLength = variant.headline.length;
+      if (headlineLength > 25) {
+        badgeHeadlineFontSize = 18; // Long headlines get smaller
+      } else if (headlineLength > 20) {
+        badgeHeadlineFontSize = 20; // Medium headlines slightly smaller
+      }
+
+      // Adjust discount font size based on length
+      const discountLength = discountDisplay.length;
+      if (discountLength > 8) {
+        badgeDiscountFontSize = 55; // Very long discounts
+      } else if (discountLength > 6) {
+        badgeDiscountFontSize = 60; // Long discounts
+      }
+    }
 
     // Style-specific HTML
     let couponStyleHTML = '';
@@ -722,7 +752,7 @@
               border: 2px solid #ffeb3b;
               white-space: nowrap;
             ">${ribbonText}</div>` : ''}
-            <div class="vip-badge" style="
+            ${vipBadgeText ? `<div class="vip-badge" style="
               position: absolute;
               top: -12px;
               left: 50%;
@@ -735,11 +765,11 @@
               font-weight: 900;
               letter-spacing: 2.5px;
               box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-            ">VIP OFFER</div>
+            ">${vipBadgeText}</div>` : ''}
             <h2 class="coupon-headline" style="
-              font-size: 22px;
+              font-size: ${badgeHeadlineFontSize}px;
               font-weight: 700;
-              margin: 0 0 10px 0;
+              margin: 20px 0 10px 0;
               line-height: 1.2;
               text-transform: uppercase;
               letter-spacing: 0.5px;
@@ -749,7 +779,7 @@
             </h2>
             ${variant.expiration_display === 'below_headline' ? expirationHTML : ''}
             <div class="coupon-discount" style="
-              font-size: 80px;
+              font-size: ${badgeDiscountFontSize}px;
               font-weight: 900;
               margin: 8px 0;
               line-height: 0.95;
@@ -761,9 +791,9 @@
               display: inline-block;
               background: ${buttonColor};
               color: ${buttonTextColor};
-              padding: 14px 42px;
+              padding: 12px 36px;
               border-radius: 50px;
-              font-size: 18px;
+              font-size: 16px;
               font-weight: 700;
               text-decoration: none;
               margin: 10px 0 8px 0;
@@ -774,16 +804,54 @@
               box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             ">${buttonText}</a>
             ${variant.disclaimer ? `
-              <p class="coupon-disclaimer" style="
-                font-size: 11px;
-                margin-top: 10px;
-                line-height: 1.3;
-                opacity: 0.92;
-                max-width: 260px;
-                color: ${disclaimerTextColor};
-              ">
-                ${variant.disclaimer}
-              </p>
+              <div style="position: relative; display: inline-block; margin-top: 8px;">
+                <div class="elegant-badge-disclaimer-trigger" style="
+                  display: inline-block;
+                  padding: 4px 12px;
+                  border-radius: 12px;
+                  background: rgba(255,255,255,0.3);
+                  color: ${disclaimerTextColor};
+                  text-align: center;
+                  cursor: pointer;
+                  font-size: 11px;
+                  font-weight: 600;
+                  transition: all 0.3s;
+                  text-decoration: underline;
+                ">Read More</div>
+                <div class="elegant-badge-disclaimer-content" style="
+                  display: none;
+                  position: absolute;
+                  bottom: calc(100% + 10px);
+                  left: 50%;
+                  transform: translateX(-50%);
+                  background: rgba(0,0,0,0.95);
+                  color: white;
+                  padding: 10px 15px;
+                  border-radius: 8px;
+                  font-size: 11px;
+                  white-space: normal;
+                  max-width: 250px;
+                  width: max-content;
+                  z-index: 1000;
+                  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                  pointer-events: none;
+                ">${variant.disclaimer}</div>
+              </div>
+              <style>
+                .elegant-badge-disclaimer-trigger:hover {
+                  background: rgba(255,255,255,0.5);
+                  transform: scale(1.1);
+                }
+                .elegant-badge-disclaimer-trigger:hover + .elegant-badge-disclaimer-content,
+                .elegant-badge-disclaimer-trigger:active + .elegant-badge-disclaimer-content {
+                  display: block !important;
+                }
+                @media (max-width: 768px) {
+                  .elegant-badge-disclaimer-trigger:active + .elegant-badge-disclaimer-content {
+                    display: block !important;
+                  }
+                }
+              </style>
             ` : ''}
             ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
           </div>
