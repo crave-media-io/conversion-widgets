@@ -989,9 +989,9 @@
                 <div class="elegant-badge-disclaimer-trigger" style="
                   display: inline-block;
 		  margin-bottom: 10px;
-                  padding: 4px 12px;
-                  border-radius: 12px;
-                  background: rgba(255,255,255,0.3);
+                  padding: 0px 0px;
+                  border-radius: 0px;
+                  background: rgba(255,255,255,0);
                   color: ${disclaimerTextColor};
                   text-align: center;
                   cursor: pointer;
