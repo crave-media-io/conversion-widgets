@@ -946,7 +946,7 @@
               font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
               font-size: ${badgeHeadlineFontSize}px;
               font-weight: 700;
-              margin: 30px 0 10px 0;
+              margin: 40px 0 10px 0;
               line-height: 1.2;
               text-transform: uppercase;
               letter-spacing: 1px;
@@ -985,7 +985,7 @@
             ">${buttonText}</a>
             ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
             ${variant.disclaimer ? `
-              <div style="position: relative; display: inline-block; margin-top: 0px;">
+              <div style="position: relative; display: inline-block; margin-top: -20px;">
                 <div class="elegant-badge-disclaimer-trigger" style="
                   display: inline-block;
                   padding: 4px 12px;
