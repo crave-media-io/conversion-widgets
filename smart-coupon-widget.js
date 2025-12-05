@@ -351,6 +351,28 @@
     return selected;
   }
 
+  function selectSessionOffer(offers) {
+    const sessionKey = `smart_coupon_offer_${CLIENT_ID}`;
+    const cached = sessionStorage.getItem(sessionKey);
+
+    // If we have a cached offer number, find the matching offer
+    if (cached) {
+      const cachedOfferNumber = parseInt(cached);
+      const cachedOffer = offers.find(o => o.offer_number === cachedOfferNumber);
+
+      if (cachedOffer) {
+        console.log('📦 Using cached offer #' + cachedOfferNumber + ':', cachedOffer.headline);
+        return cachedOffer;
+      }
+    }
+
+    // No cached offer or it's no longer valid, select randomly
+    const selected = offers[Math.floor(Math.random() * offers.length)];
+    sessionStorage.setItem(sessionKey, selected.offer_number.toString());
+    console.log('🎟️ Selected offer #' + selected.offer_number + ' for session:', selected.headline);
+    return selected;
+  }
+
   // ============================================
   // EXPIRATION DATE CALCULATION
   // ============================================
@@ -391,6 +413,116 @@
   }
 
   // ============================================
+  // URL MATCHING FOR OFFER FILTERING
+  // ============================================
+  function matchesUrl(currentPath, targetUrl) {
+    if (!targetUrl) return false;
+
+    // Extract pathname from full URLs (https://example.com/page -> /page)
+    const extractPath = (url) => {
+      // If it's a full URL (starts with http:// or https://)
+      if (url.match(/^https?:\/\//i)) {
+        try {
+          const urlObj = new URL(url);
+          return urlObj.pathname;
+        } catch (e) {
+          // If URL parsing fails, return as-is
+          return url;
+        }
+      }
+
+      // If it looks like a domain without protocol (example.com/path or www.example.com/path)
+      // Check for pattern: word.word/something OR www.word.word/something
+      if (url.match(/^([a-z0-9-]+\.)+[a-z]{2,}\//i)) {
+        try {
+          // Add https:// and parse
+          const urlObj = new URL('https://' + url);
+          return urlObj.pathname;
+        } catch (e) {
+          // If parsing fails, return as-is
+          return url;
+        }
+      }
+
+      // Already a path (starts with / or is just a path)
+      return url;
+    };
+
+    // Normalize paths - remove trailing slash unless it's the root path "/"
+    const normalizePath = (path) => {
+      if (path === '/' || !path) return path;
+      return path.replace(/\/$/, ''); // Remove trailing slash
+    };
+
+    const normalizedCurrent = normalizePath(extractPath(currentPath));
+    const normalizedTarget = normalizePath(extractPath(targetUrl));
+
+    // Handle wildcards
+    if (normalizedTarget.includes('*')) {
+      const pattern = normalizedTarget.replace(/\*/g, '.*');
+      const regex = new RegExp('^' + pattern + '$');
+      return regex.test(normalizedCurrent);
+    }
+
+    // Exact match (after normalization)
+    return normalizedCurrent === normalizedTarget;
+  }
+
+  function isOfferVisibleOnCurrentPage(offer) {
+    // If custom URL is not enabled, show on all pages (global offer)
+    if (!offer.use_custom_url) {
+      return true;
+    }
+
+    const currentPath = window.location.pathname;
+
+    // Parse excluded URLs
+    let excludedUrls = offer.excluded_urls || [];
+    if (typeof excludedUrls === 'string') {
+      try {
+        excludedUrls = JSON.parse(excludedUrls);
+      } catch (e) {
+        excludedUrls = [];
+      }
+    }
+    if (!Array.isArray(excludedUrls)) excludedUrls = [];
+
+    // Check if current page is excluded (takes precedence)
+    for (let i = 0; i < excludedUrls.length; i++) {
+      if (matchesUrl(currentPath, excludedUrls[i])) {
+        console.log(`🚫 Offer ${offer.offer_number} excluded from ${currentPath}`);
+        return false;
+      }
+    }
+
+    // Parse additional URLs
+    let additionalUrls = offer.additional_urls || [];
+    if (typeof additionalUrls === 'string') {
+      try {
+        additionalUrls = JSON.parse(additionalUrls);
+      } catch (e) {
+        additionalUrls = [];
+      }
+    }
+    if (!Array.isArray(additionalUrls)) additionalUrls = [];
+
+    // Check primary URL
+    if (offer.primary_page_url && matchesUrl(currentPath, offer.primary_page_url)) {
+      return true;
+    }
+
+    // Check additional URLs
+    for (let i = 0; i < additionalUrls.length; i++) {
+      if (matchesUrl(currentPath, additionalUrls[i])) {
+        return true;
+      }
+    }
+
+    // No match found
+    return false;
+  }
+
+  // ============================================
   // ANALYTICS TRACKING
   // ============================================
   async function sendToSupabase(eventType, variant) {
@@ -407,7 +539,7 @@
           client_id: CLIENT_ID,
           offer_number: variant.offer_number,
           background_color: state.sessionBackgroundColor,
-          design_style: state.sessionDesignStyle,
+          design_style: variant.design_style || 'dashed',
           headline: variant.headline,
           button_text: state.sessionButtonText,
           event_type: eventType,
@@ -474,7 +606,37 @@
 
     const bgColor = state.sessionBackgroundColor;
     const darkenedColor = adjustColor(bgColor, -20);
-    const style = state.sessionDesignStyle;
+
+    // Get all possible styles for this offer (per-offer design styles)
+    let offerStyles = variant.design_styles || ['dashed'];
+
+    // Ensure it's an array
+    if (!Array.isArray(offerStyles)) {
+      // Handle if it came as JSONB string
+      try {
+        offerStyles = JSON.parse(offerStyles);
+      } catch (e) {
+        offerStyles = ['dashed'];
+      }
+    }
+
+    // Select one style for this offer using session-based persistence
+    const sessionKey = `smart_coupon_style_offer_${variant.offer_number}_${CLIENT_ID}`;
+    const cached = sessionStorage.getItem(sessionKey);
+
+    let style;
+    if (cached && offerStyles.includes(cached)) {
+      style = cached;
+      console.log('📦 Using cached style for offer #' + variant.offer_number + ':', style);
+    } else {
+      style = offerStyles[Math.floor(Math.random() * offerStyles.length)];
+      sessionStorage.setItem(sessionKey, style);
+      console.log('🎭 Selected style for offer #' + variant.offer_number + ':', style);
+    }
+
+    // Store the selected style in variant for analytics tracking
+    variant.design_style = style;
+
     const buttonColor = config.smart_coupon_button_color || '#fed80e';
     const buttonTextColor = config.smart_coupon_button_text_color || '#000000';
     const headlineTextColor = config.smart_coupon_offer_text_color || '#ffffff';
@@ -496,7 +658,7 @@
       vipBadgeText = ''; // No VIP badge
     }
     const buttonText = state.sessionButtonText;
-    const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    const fontFamily = '"Open Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
     const showBranding = config.show_branding !== false;
 
     // Format discount display
@@ -515,7 +677,7 @@
       <p class="coupon-expiration" style="
         font-size: 12px;
         font-weight: 600;
-        margin-top: ${variant.expiration_display === 'below_headline' ? '15px' : '20px'};
+        margin-top: ${variant.expiration_display === 'below_headline' ? '15px' : '8px'};
         opacity: 0.95;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -554,18 +716,24 @@
     if (style === 'badge') {
       // Adjust headline font size based on length
       const headlineLength = variant.headline.length;
-      if (headlineLength > 25) {
-        badgeHeadlineFontSize = 18; // Long headlines get smaller
+      if (headlineLength > 28) {
+        badgeHeadlineFontSize = 18; // Extra long headlines
       } else if (headlineLength > 20) {
-        badgeHeadlineFontSize = 20; // Medium headlines slightly smaller
+        badgeHeadlineFontSize = 20; // Long headlines (like "Offer Test Rug Cleaning" = 24 chars)
+      } else if (headlineLength > 15) {
+        badgeHeadlineFontSize = 22; // Medium headlines
+      } else {
+        badgeHeadlineFontSize = 24; // Short headlines (like "EXCLUSIVE DEAL")
       }
 
-      // Adjust discount font size based on length
+      // Adjust discount font size based on length - proportional to headline size
       const discountLength = discountDisplay.length;
       if (discountLength > 8) {
-        badgeDiscountFontSize = 55; // Very long discounts
+        badgeDiscountFontSize = 48; // Very long discounts
       } else if (discountLength > 6) {
-        badgeDiscountFontSize = 60; // Long discounts
+        badgeDiscountFontSize = 50; // Long discounts (like "15% OFF" = 7 chars)
+      } else {
+        badgeDiscountFontSize = 65; // Short discounts
       }
     }
 
@@ -586,19 +754,21 @@
           padding: 40px;
           text-align: center;
           color: ${headlineTextColor};
-          font-family: ${fontFamily};
+          font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         ">
-          <h2 class="coupon-headline" style="
+          <div class="coupon-headline" style="
+            font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             font-size: 30px;
             font-weight: 700;
-            margin: 0 0 20px 0;
+            margin-top: 25px;
             line-height: 1.2;
             color: ${headlineTextColor};
           ">
             ${variant.headline}
-          </h2>
+          </div>
           ${variant.expiration_display === 'below_headline' ? expirationHTML : ''}
           <div class="coupon-discount" style="
+            font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             font-size: 75px;
             font-weight: 900;
             margin: 20px 0;
@@ -651,7 +821,7 @@
           overflow: visible;
           transition: transform 0.3s, box-shadow 0.3s;
           cursor: pointer;
-          font-family: ${fontFamily};
+          font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         ">
           <style>
             .smart-coupon-ticket:hover {
@@ -659,7 +829,8 @@
               box-shadow: 0 12px 40px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.15);
             }
           </style>
-          <h2 class="coupon-headline" style="
+          <div class="coupon-headline" style="
+            font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             font-size: 30px;
             font-weight: 700;
             margin: 0 0 20px 0;
@@ -669,9 +840,10 @@
             color: ${headlineTextColor};
           ">
             ${variant.headline}
-          </h2>
+          </div>
           ${variant.expiration_display === 'below_headline' ? expirationHTML : ''}
           <div class="coupon-discount" style="
+            font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             font-size: 75px;
             font-weight: 900;
             margin: 20px 0;
@@ -711,79 +883,87 @@
         </div>
       `;
     } else if (style === 'badge') {
-      // Style 3: Elegant Badge (circular seal)
+      // Style 3: Elegant Badge (circular seal) - matching original draft
+      const safeFont = fontFamily.replace(/'/g, "\\'");
       couponStyleHTML = `
         ${headlineHTML}
         <div class="smart-coupon-container" style="
           max-width: 400px;
           margin: 40px auto;
           position: relative;
-          font-family: ${fontFamily};
+          font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         ">
           <div class="smart-coupon-widget smart-coupon-badge" data-instance="${instanceIndex}" style="
             border: 4px solid #ffffff;
             border-radius: 50%;
             background: radial-gradient(circle, ${bgColor} 0%, ${darkenedColor} 100%);
             box-shadow: 0 4px 20px rgba(0,0,0,0.3), inset 0 0 0 8px rgba(255,255,255,0.2);
-            padding: 55px 45px;
+            padding: 50px 40px;
             text-align: center;
             color: ${headlineTextColor};
             position: relative;
-            width: 340px;
-            height: 340px;
+            width: 320px;
+            height: 320px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             margin: 40px auto;
+            font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
           ">
             ${ribbonText ? `<div class="smart-coupon-ribbon" style="
               position: absolute;
-              top: 35px;
-              right: -28px;
+              top: 28px;
+              right: -26px;
               background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
               color: #000;
-              padding: 7px 28px;
-              font-size: 12px;
+              padding: 6px 26px;
+              font-size: 11px;
               font-weight: 900;
               transform: rotate(20deg);
               box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-              letter-spacing: 1.2px;
+              letter-spacing: 1.1px;
               border: 2px solid #ffeb3b;
               white-space: nowrap;
+              font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             ">${ribbonText}</div>` : ''}
             ${vipBadgeText ? `<div class="vip-badge" style="
               position: absolute;
-              top: -12px;
+              top: -10px;
               left: 50%;
               transform: translateX(-50%);
               background: #ffd700;
               color: #000;
-              padding: 5px 18px;
-              border-radius: 22px;
-              font-size: 11px;
+              padding: 4px 16px;
+              border-radius: 20px;
+              font-size: 10px;
               font-weight: 900;
-              letter-spacing: 2.5px;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+              letter-spacing: 2px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+              font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             ">${vipBadgeText}</div>` : ''}
-            <h2 class="coupon-headline" style="
+            <div class="coupon-headline" style="
+              font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
               font-size: ${badgeHeadlineFontSize}px;
               font-weight: 700;
-              margin: 20px 0 10px 0;
+              margin: 30px 0 10px 0;
               line-height: 1.2;
               text-transform: uppercase;
-              letter-spacing: 0.5px;
+              letter-spacing: 1px;
               color: ${headlineTextColor};
+              text-align: center;
             ">
               ${variant.headline}
-            </h2>
+            </div>
             ${variant.expiration_display === 'below_headline' ? expirationHTML : ''}
             <div class="coupon-discount" style="
+              font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
               font-size: ${badgeDiscountFontSize}px;
               font-weight: 900;
-              margin: 8px 0;
-              line-height: 0.95;
+              margin: 10px 0;
+              line-height: 1;
               text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+              text-align: center;
             ">
               ${discountDisplay}
             </div>
@@ -791,20 +971,21 @@
               display: inline-block;
               background: ${buttonColor};
               color: ${buttonTextColor};
-              padding: 12px 36px;
+              padding: 11px 32px;
               border-radius: 50px;
-              font-size: 16px;
+              font-size: 15px;
               font-weight: 700;
               text-decoration: none;
-              margin: 10px 0 8px 0;
+              margin: 8px 0;
               transition: all 0.3s;
               cursor: pointer;
               text-transform: uppercase;
               letter-spacing: 1px;
               box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             ">${buttonText}</a>
+            ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
             ${variant.disclaimer ? `
-              <div style="position: relative; display: inline-block; margin-top: 8px;">
+              <div style="position: relative; display: inline-block; margin-top: 0px;">
                 <div class="elegant-badge-disclaimer-trigger" style="
                   display: inline-block;
                   padding: 4px 12px;
@@ -853,7 +1034,6 @@
                 }
               </style>
             ` : ''}
-            ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
           </div>
         </div>
       `;
@@ -988,6 +1168,14 @@
       console.log('🎟️ Smart Coupons Widget initializing...');
       console.log('📍 Client ID:', CLIENT_ID);
 
+      // Load Open Sans font
+      if (!document.querySelector('link[href*="Open+Sans"]')) {
+        const fontLink = document.createElement('link');
+        fontLink.rel = 'stylesheet';
+        fontLink.href = 'https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700;800;900&display=swap';
+        document.head.appendChild(fontLink);
+      }
+
       // Fetch config
       state.config = await fetchClientConfig();
       if (!state.config) {
@@ -1016,11 +1204,25 @@
       }
 
       // Fetch coupon offers
-      state.offers = await fetchCouponOffers();
-      if (state.offers.length === 0) {
+      const allOffers = await fetchCouponOffers();
+      if (allOffers.length === 0) {
         console.warn('⚠️ No active coupon offers found - widget will not display');
         return;
       }
+
+      // Filter offers based on current page URL
+      state.offers = allOffers.filter(offer => isOfferVisibleOnCurrentPage(offer));
+
+      if (state.offers.length === 0) {
+        console.log(`📍 No offers match the current page: ${window.location.pathname}`);
+        console.log(`💡 Tip: Offers with custom URLs only show on matching pages. Check your URL targeting settings.`);
+        return;
+      }
+
+      console.log(`✅ ${state.offers.length} of ${allOffers.length} offers match this page`);
+      state.offers.forEach(offer => {
+        console.log(`   - Offer ${offer.offer_number}: ${offer.headline}${offer.use_custom_url ? ' (URL-targeted)' : ' (global)'}`);
+      });
 
       // Fetch headlines (if enabled)
       state.headlines = await fetchHeadlines(state.config);
@@ -1083,17 +1285,27 @@
       console.log('🎨 Background Color:', state.sessionBackgroundColor);
       console.log('🎭 Design Style:', state.sessionDesignStyle);
 
-      // Create variants and render first one
-      const variants = createVariantsFromOffers(state.offers);
-      const selectedVariant = variants[0]; // Start with first offer
+      // Select ONE offer for this user's session (A/B testing)
+      const selectedOffer = selectSessionOffer(state.offers);
+
+      // Create variant from selected offer
+      const selectedVariant = {
+        offer_number: selectedOffer.offer_number,
+        headline: selectedOffer.headline,
+        discount_type: selectedOffer.discount_type,
+        discount_value: selectedOffer.discount_value,
+        button_text: selectedOffer.button_text,
+        disclaimer: selectedOffer.disclaimer,
+        expiration_mode: selectedOffer.expiration_mode,
+        expiration_display: selectedOffer.expiration_display,
+        design_styles: selectedOffer.design_styles || [selectedOffer.design_style] || ['dashed'], // Support both new array and old single style
+        use_custom_url: selectedOffer.use_custom_url,
+        primary_page_url: selectedOffer.primary_page_url,
+        additional_urls: selectedOffer.additional_urls,
+        excluded_urls: selectedOffer.excluded_urls
+      };
 
       renderCoupon(selectedVariant);
-
-      // Start rotation if multiple offers
-      if (variants.length > 1) {
-        console.log('🔄 Starting offer rotation');
-        startRotation(variants);
-      }
 
       // Start headline rotation if multiple headlines
       if (state.headlines && state.headlines.length > 1) {
