@@ -678,6 +678,7 @@
         font-size: 12px;
         font-weight: 600;
         margin-top: ${variant.expiration_display === 'below_headline' ? '0px' : '8px'};
+		margin-botton: 0px;
         opacity: 0.95;
         text-transform: uppercase;
         letter-spacing: 1px;
