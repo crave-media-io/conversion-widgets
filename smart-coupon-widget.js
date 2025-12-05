@@ -677,7 +677,7 @@
       <p class="coupon-expiration" style="
         font-size: 12px;
         font-weight: 600;
-        margin-top: ${variant.expiration_display === 'below_headline' ? '15px' : '8px'};
+        margin-top: ${variant.expiration_display === 'below_headline' ? '0px' : '8px'};
         opacity: 0.95;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -785,7 +785,7 @@
             font-size: 18px;
             font-weight: 600;
             text-decoration: none;
-            margin: 20px 0;
+            margin: 5px 0;
             transition: all 0.3s;
             cursor: pointer;
           ">${buttonText}</a>
@@ -846,7 +846,7 @@
             font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             font-size: 75px;
             font-weight: 900;
-            margin: 20px 0;
+            margin: 5px 0;
             line-height: 1;
             letter-spacing: -2px;
           ">
@@ -985,9 +985,10 @@
             ">${buttonText}</a>
             ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
             ${variant.disclaimer ? `
-              <div style="position: relative; display: inline-block; margin-top: -20px;">
+              <div style="position: relative; display: inline-block; margin-top: -10px;">
                 <div class="elegant-badge-disclaimer-trigger" style="
                   display: inline-block;
+		  margin-bottom: 10px;
                   padding: 4px 12px;
                   border-radius: 12px;
                   background: rgba(255,255,255,0.3);
