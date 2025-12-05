@@ -678,7 +678,7 @@
         font-size: 12px;
         font-weight: 600;
         margin-top: ${variant.expiration_display === 'below_headline' ? '0px' : '8px'};
-		margin-botton: 0px;
+	margin-bottom: 0px;
         opacity: 0.95;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -693,20 +693,28 @@
 
     // Headline HTML (outside coupon, like Smart Button)
     const headlineHTML = rotatingHeadline ? `
+      <style>
+        @keyframes fadeHeadline {
+          0% { opacity: 0; transform: translateY(-10px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+      </style>
       <div class="rotating-headline" style="
         margin: 0 0 35px 0;
         text-align: center;
         font-family: ${fontFamily};
       ">
-        <h2 style="
+        <div class="smart-coupon-headline" style="
+          margin: 0 0 20px;
           font-size: 28px;
           font-weight: 700;
           line-height: 1.3;
           color: ${headlineColorForRotating};
-          margin: 0;
+          font-family: inherit;
+          animation: 0.6s ease-in-out 0s 1 normal none running fadeHeadline;
         ">
           ${rotatingHeadline}
-        </h2>
+        </div>
       </div>
     ` : '';
 
