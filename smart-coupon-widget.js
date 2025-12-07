@@ -718,33 +718,9 @@
       </div>
     ` : '';
 
-    // Adaptive font sizing for Elegant Badge (based on content length)
-    let badgeHeadlineFontSize = 22; // Default
-    let badgeDiscountFontSize = 65; // Default
-
-    if (style === 'badge') {
-      // Adjust headline font size based on length
-      const headlineLength = variant.headline.length;
-      if (headlineLength > 28) {
-        badgeHeadlineFontSize = 18; // Extra long headlines
-      } else if (headlineLength > 20) {
-        badgeHeadlineFontSize = 20; // Long headlines (like "Offer Test Rug Cleaning" = 24 chars)
-      } else if (headlineLength > 15) {
-        badgeHeadlineFontSize = 22; // Medium headlines
-      } else {
-        badgeHeadlineFontSize = 24; // Short headlines (like "EXCLUSIVE DEAL")
-      }
-
-      // Adjust discount font size based on length - proportional to headline size
-      const discountLength = discountDisplay.length;
-      if (discountLength > 8) {
-        badgeDiscountFontSize = 48; // Very long discounts
-      } else if (discountLength > 6) {
-        badgeDiscountFontSize = 50; // Long discounts (like "15% OFF" = 7 chars)
-      } else {
-        badgeDiscountFontSize = 65; // Short discounts
-      }
-    }
+    // Fixed font sizing for Elegant Badge
+    const badgeHeadlineFontSize = 22;
+    const badgeDiscountFontSize = 50;
 
     // Style-specific HTML
     let couponStyleHTML = '';
@@ -994,7 +970,7 @@
             ">${buttonText}</a>
             ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
             ${variant.disclaimer ? `
-              <div style="position: relative; display: inline-block; margin-top: -10px;">
+              <div style="position: relative; display: inline-block; margin-top: ${expirationText ? '-10px' : '-10px'};">
                 <div class="elegant-badge-disclaimer-trigger" style="
                   display: inline-block;
 		  margin-bottom: 10px;
