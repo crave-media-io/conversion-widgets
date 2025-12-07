@@ -1034,7 +1034,7 @@
         color: #999;
         font-family: ${fontFamily};
       ">
-        Powered by <a href="https://www.cravemedia.io" target="_blank" style="color: #667eea; text-decoration: none;">Conversion Widgets</a>
+        Powered by <a href="https://www.cravemedia.io" target="_blank" style="color: #667eea; text-decoration: none;">Crave Media</a>
       </div>
     ` : '';
 
