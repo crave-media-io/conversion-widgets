@@ -421,15 +421,15 @@
     }
 
     try {
+      // Use public analytics API endpoint (no JWT required for widgets)
       const response = await fetch(
-        SUPABASE.url + '/rest/v1/headline_stats?client_id=eq.' + CLIENT_ID + '&page_url=eq.' + window.location.pathname,
-        {
-          headers: {
-            'apikey': SUPABASE.key,
-            'Authorization': 'Bearer ' + SUPABASE.key
-          }
-        }
+        'https://conversion-widget.vercel.app/api/analytics/headlines-public?client_id=' + CLIENT_ID + '&page_url=' + encodeURIComponent(window.location.pathname)
       );
+
+      if (!response.ok) {
+        console.warn('📊 Analytics API error:', response.status, '- Falling back to first headline');
+        return variants[0];
+      }
 
       const stats = await response.json();
 
