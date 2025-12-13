@@ -1,12 +1,18 @@
 /**
- * Widget Gateway Script v1.4
+ * Widget Gateway Script v1.5
  *
  * This is the ONLY script clients need to install.
  * It handles:
  * - Account status checking (active/suspended/canceled)
+ * - Domain verification (prevents unauthorized use)
  * - Enabled widgets filtering
  * - Dynamic widget loading
  * - Silent blocking (NO customer-facing messages ever)
+ *
+ * Changelog v1.5:
+ * - ADDED: Domain verification against booking_url
+ * - SECURITY: Blocks widgets if domain doesn't match client's registered domain
+ * - Allows subdomains of registered domain (e.g., shop.example.com matches example.com)
  *
  * Changelog v1.4:
  * - ADDED: Smart Coupons widget support (4th widget type)
@@ -90,6 +96,62 @@
     }
 
     console.log('[Widget Gateway] Initializing for client:', clientId);
+
+    /**
+     * Extract domain from URL
+     * Handles http/https, www prefix, paths, etc.
+     */
+    function extractDomain(url) {
+        if (!url) return null;
+
+        try {
+            // Add protocol if missing
+            let fullUrl = url;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                fullUrl = 'https://' + url;
+            }
+
+            const urlObj = new URL(fullUrl);
+            let domain = urlObj.hostname.toLowerCase();
+
+            // Remove www. prefix
+            domain = domain.replace(/^www\./, '');
+
+            return domain;
+        } catch (e) {
+            console.error('[Widget Gateway] Error parsing URL:', url, e);
+            return null;
+        }
+    }
+
+    /**
+     * Check if current domain matches or is subdomain of allowed domain
+     */
+    function isDomainAuthorized(bookingUrl, currentHostname) {
+        const allowedDomain = extractDomain(bookingUrl);
+
+        if (!allowedDomain) {
+            // If no booking URL configured, allow (backwards compatibility)
+            console.warn('[Widget Gateway] No booking URL configured - domain verification skipped');
+            return true;
+        }
+
+        // Normalize current domain (remove www., lowercase)
+        const currentDomain = currentHostname.toLowerCase().replace(/^www\./, '');
+
+        // Check exact match
+        if (currentDomain === allowedDomain) {
+            return true;
+        }
+
+        // Check if current domain is a subdomain of allowed domain
+        // e.g., shop.example.com should match example.com
+        if (currentDomain.endsWith('.' + allowedDomain)) {
+            return true;
+        }
+
+        return false;
+    }
 
     /**
      * Fetch client configuration from Supabase
@@ -221,6 +283,22 @@
         if (isComplimentary || isUnlimited || isComplimentaryStatus) {
             console.log('[Widget Gateway] Account is complimentary or unlimited - widgets will always load');
         }
+
+        // Domain verification - check if current domain matches booking URL
+        const bookingUrl = client.booking_url;
+        const currentHostname = window.location.hostname;
+
+        console.log('[Widget Gateway] Domain verification...');
+        console.log('[Widget Gateway] Booking URL:', bookingUrl);
+        console.log('[Widget Gateway] Current domain:', currentHostname);
+
+        if (!isDomainAuthorized(bookingUrl, currentHostname)) {
+            console.warn('[Widget Gateway] ⛔ Domain not authorized. Expected domain from booking URL:', bookingUrl, '| Current domain:', currentHostname);
+            console.warn('[Widget Gateway] Widgets blocked - domain mismatch. Contact support if this is incorrect.');
+            return; // Block widgets silently - no customer-facing message
+        }
+
+        console.log('[Widget Gateway] ✓ Domain verified');
 
         // Get enabled widgets
         let enabledWidgets = client.enabled_widgets || [];
