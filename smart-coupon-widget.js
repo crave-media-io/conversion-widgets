@@ -582,6 +582,72 @@
   // ============================================
   // GET CURRENT ROTATING HEADLINE
   // ============================================
+
+  // Select best-performing headline using aggregate stats (A/B testing)
+  async function selectBestHeadlineAggregate() {
+    if (!state.headlines || state.headlines.length === 0) {
+      return 0; // Return index 0 if no headlines
+    }
+
+    const epsilon = 0.2; // 20% exploration rate
+    const pageUrl = state.canonicalPageUrl || window.location.pathname;
+
+    // 20% of the time, explore by showing random headline
+    if (Math.random() < epsilon) {
+      const randomIndex = Math.floor(Math.random() * state.headlines.length);
+      console.log('🎲 Coupon Headline: Exploring (random):', state.headlines[randomIndex]);
+      return randomIndex;
+    }
+
+    try {
+      // Use public analytics API endpoint (no JWT required for widgets)
+      const response = await fetch(
+        'https://conversion-widget.vercel.app/api/analytics/headlines-public?client_id=' + CLIENT_ID + '&page_url=' + encodeURIComponent(pageUrl)
+      );
+
+      if (!response.ok) {
+        console.warn('📊 Coupon Headline: Analytics API error:', response.status, '- Using first headline');
+        return 0;
+      }
+
+      const stats = await response.json();
+
+      if (!stats || stats.length === 0) {
+        console.log('📊 Coupon Headline: No stats yet, showing first headline');
+        return 0;
+      }
+
+      // Find the best headline by conversion rate
+      let bestHeadline = null;
+      let bestRate = 0;
+
+      stats.forEach(stat => {
+        if (stat.conversion_rate > bestRate) {
+          bestRate = stat.conversion_rate;
+          bestHeadline = stat.headline;
+        }
+      });
+
+      if (!bestHeadline) {
+        return 0;
+      }
+
+      // Find index of best headline
+      const bestIndex = state.headlines.findIndex(h => h === bestHeadline);
+
+      if (bestIndex !== -1) {
+        console.log('🏆 Coupon Headline: Global winner (' + bestRate.toFixed(2) + '%):', bestHeadline);
+        return bestIndex;
+      }
+
+      return 0;
+
+    } catch (error) {
+      console.error('📊 Coupon Headline: Error fetching stats:', error);
+      return 0;
+    }
+  }
+
   function getCurrentHeadline() {
     if (!state.headlines || state.headlines.length === 0) {
       return null;
@@ -1214,6 +1280,9 @@
       state.headlines = await fetchHeadlines(state.config);
       if (state.headlines && state.headlines.length > 0) {
         console.log(`📋 Loaded ${state.headlines.length} headlines for rotation`);
+
+        // Select best-performing headline using A/B testing analytics
+        state.currentHeadlineIndex = await selectBestHeadlineAggregate();
       }
 
       // Parse JSONB columns
