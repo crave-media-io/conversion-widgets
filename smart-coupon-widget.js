@@ -743,7 +743,7 @@
       <p class="coupon-expiration" style="
         font-size: 12px;
         font-weight: 600;
-        margin-top: ${variant.expiration_display === 'below_headline' ? '0px' : '8px'};
+        margin-top: ${variant.expiration_display === 'below_headline' ? '0px' : '0px'};
 	margin-bottom: 0px;
         opacity: 0.95;
         text-transform: uppercase;
@@ -1011,7 +1011,7 @@
               font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
               font-size: ${badgeDiscountFontSize}px;
               font-weight: 900;
-              margin: 10px 0;
+              margin: 0px 0;
               line-height: 1;
               text-shadow: 0 2px 8px rgba(0,0,0,0.3);
               text-align: center;
