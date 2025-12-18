@@ -809,6 +809,22 @@
       }
     }
 
+    // Limit colors and texts based on plan tier (Trial/Starter = 3, Pro+ = 5)
+    const isComplimentary = state.config.is_complimentary || false;
+    const plan = state.config.subscription_plan || 'starter';
+    const isPro = plan === 'professional' || plan === 'premium' || plan === 'expert' || plan === 'unlimited';
+
+    if (!isComplimentary && !isPro) {
+      if (buttonColors.length > 3) {
+        console.log('🎨 Trial/Starter plan detected - limiting to first 3 button colors');
+        buttonColors = buttonColors.slice(0, 3);
+      }
+      if (buttonTexts.length > 3) {
+        console.log('📝 Trial/Starter plan detected - limiting to first 3 button texts');
+        buttonTexts = buttonTexts.slice(0, 3);
+      }
+    }
+
     // Select session-consistent button text and color
     state.sessionButtonText = selectSessionButtonText(buttonTexts);
     state.sessionButtonColor = selectSessionButtonColor(buttonColors);
