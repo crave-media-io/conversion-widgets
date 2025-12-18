@@ -1297,6 +1297,16 @@
           backgroundColors = ['#008b45'];
         }
       }
+
+      // Limit colors based on plan tier (Trial/Starter = 3 colors, Pro+ = 5 colors)
+      const isComplimentary = state.config.is_complimentary || false;
+      const plan = state.config.subscription_plan || 'starter';
+      const isPro = plan === 'professional' || plan === 'premium' || plan === 'expert' || plan === 'unlimited';
+
+      if (!isComplimentary && !isPro && backgroundColors.length > 3) {
+        console.log('🎨 Trial/Starter plan detected - limiting to first 3 background colors');
+        backgroundColors = backgroundColors.slice(0, 3);
+      }
       if (typeof designStyles === 'string') {
         try {
           designStyles = JSON.parse(designStyles);
@@ -1310,6 +1320,12 @@
         } catch (e) {
           buttonTexts = ['Schedule Now'];
         }
+      }
+
+      // Limit button texts based on plan tier (Trial/Starter = 3 texts, Pro+ = 5 texts)
+      if (!isComplimentary && !isPro && buttonTexts.length > 3) {
+        console.log('📝 Trial/Starter plan detected - limiting to first 3 button texts');
+        buttonTexts = buttonTexts.slice(0, 3);
       }
 
       // Select session-consistent variants
