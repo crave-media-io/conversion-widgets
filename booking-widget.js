@@ -8,6 +8,39 @@
   const CLIENT_ID = scriptTag ? scriptTag.getAttribute('data-client-id') : null;
   const CONTAINER_ID = scriptTag ? scriptTag.getAttribute('data-container') : 'crave-booking-widget';
 
+  // Domain validation function
+  function checkDomainMatch(allowedDomain) {
+    // If no domain specified, allow all (backward compatibility)
+    if (!allowedDomain) {
+      return true;
+    }
+
+    const currentDomain = window.location.hostname.toLowerCase();
+    const cleanCurrent = currentDomain.replace(/^www\./, '');
+
+    // Extract domain from URL if full URL provided
+    let cleanAllowed;
+    try {
+      const url = new URL(allowedDomain.startsWith('http') ? allowedDomain : `https://${allowedDomain}`);
+      cleanAllowed = url.hostname.toLowerCase().replace(/^www\./, '');
+    } catch {
+      cleanAllowed = allowedDomain.toLowerCase().replace(/^www\./, '');
+    }
+
+    // Special case: allow localhost for development
+    if (currentDomain === 'localhost' || currentDomain === '127.0.0.1') {
+      console.log('[Booking Widget] Localhost detected - allowing for development');
+      return true;
+    }
+
+    if (cleanCurrent !== cleanAllowed) {
+      console.warn(`[Booking Widget] Domain mismatch. Expected ${cleanAllowed}, got ${cleanCurrent}`);
+      return false;
+    }
+
+    return true;
+  }
+
   // Widget state
   const state = {
     config: null,
@@ -42,6 +75,44 @@
     };
   }
 
+  // Fire GA4 event on successful booking
+  function fireGA4Event(bookingData) {
+    const ga4Id = state.config?.ga4_measurement_id;
+    if (!ga4Id) return;
+
+    // Check if gtag is available
+    if (typeof gtag !== 'function') {
+      // Load gtag if not already present
+      if (!document.querySelector(`script[src*="gtag/js?id=${ga4Id}"]`)) {
+        const script = document.createElement('script');
+        script.src = `https://www.googletagmanager.com/gtag/js?id=${ga4Id}`;
+        script.async = true;
+        document.head.appendChild(script);
+
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function() { dataLayer.push(arguments); };
+        gtag('js', new Date());
+        gtag('config', ga4Id);
+      }
+    }
+
+    // Wait a tick for gtag to be ready, then fire event
+    setTimeout(() => {
+      if (typeof gtag === 'function') {
+        gtag('event', 'generate_lead', {
+          event_category: 'booking',
+          event_label: bookingData.booking_reference,
+          source: state.attribution?.utm_source || 'direct',
+          medium: state.attribution?.utm_medium || 'none',
+          campaign: state.attribution?.utm_campaign || 'none',
+          headline_variant: state.currentHeadline?.headline_text || 'default',
+          service_name: bookingData.service_name || 'none'
+        });
+        console.log('[Booking Widget] GA4 generate_lead event fired');
+      }
+    }, 100);
+  }
+
   // Initialize widget
   async function init() {
     if (!CLIENT_ID) {
@@ -70,6 +141,13 @@
       state.config = data.config;
       state.services = data.services || [];
       state.headlines = data.headlines || [];
+
+      // Check domain validation (uses allowed_domain from config or booking_url from client)
+      const allowedDomain = data.allowed_domain || data.booking_url;
+      if (!checkDomainMatch(allowedDomain)) {
+        console.log('[Booking Widget] Blocked due to domain mismatch');
+        return;
+      }
 
       // Select random headline for A/B testing
       if (state.headlines.length > 0) {
@@ -187,6 +265,15 @@
             <textarea id="crv-notes" name="notes" class="crv-input crv-textarea" rows="3" placeholder="Any details about your request..."></textarea>
           </div>
 
+          ${config.show_checkbox ? `
+            <div class="crv-form-group crv-checkbox-group">
+              <label class="crv-checkbox-label">
+                <input type="checkbox" id="crv-checkbox" name="custom_checkbox" ${config.checkbox_required ? 'required' : ''}>
+                <span>${escapeHtml(config.checkbox_label || 'I agree to the terms and conditions')}</span>
+              </label>
+            </div>
+          ` : ''}
+
           <button type="submit" class="crv-submit-btn">
             <span class="crv-btn-text">${escapeHtml(config.button_text)}</span>
             <span class="crv-btn-loading" style="display: none;">
@@ -296,6 +383,29 @@
       .crv-textarea {
         resize: vertical;
         min-height: 80px;
+      }
+
+      .crv-checkbox-group {
+        margin-top: 8px;
+      }
+
+      .crv-checkbox-label {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 14px;
+        color: ${textColor};
+        line-height: 1.4;
+      }
+
+      .crv-checkbox-label input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+        flex-shrink: 0;
+        accent-color: ${primaryColor};
+        cursor: pointer;
       }
 
       .crv-submit-btn {
@@ -496,6 +606,7 @@
         requested_date: formData.get('date'),
         requested_time: formData.get('time') || null,
         notes: formData.get('notes') || null,
+        checkbox_checked: formData.get('custom_checkbox') === 'on',
         // Attribution
         headline_id: state.currentHeadline?.id || null,
         headline_text: state.currentHeadline?.headline_text || null,
@@ -511,6 +622,12 @@
       const result = await response.json();
 
       if (response.ok && result.success) {
+        // Fire GA4 event
+        fireGA4Event({
+          booking_reference: result.booking_reference,
+          service_name: bookingData.service_name
+        });
+
         // Show success message
         showSuccess(result);
       } else {
