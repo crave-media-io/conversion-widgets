@@ -6,7 +6,7 @@
   // Get client ID from script tag
   const scriptTag = document.currentScript || document.querySelector('script[data-client-id][src*="booking-widget"]');
   const CLIENT_ID = scriptTag ? scriptTag.getAttribute('data-client-id') : null;
-  const CONTAINER_ID = scriptTag ? scriptTag.getAttribute('data-container') : 'crave-booking-widget';
+  const CONTAINER_ID = (scriptTag && scriptTag.getAttribute('data-container')) || 'crave-booking-widget';
 
   // Domain validation function
   function checkDomainMatch(allowedDomain) {
