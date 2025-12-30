@@ -232,6 +232,7 @@
               <select id="crv-time" name="time" class="crv-input" disabled>
                 <option value="">Select a date first...</option>
               </select>
+              <span id="crv-timezone-hint" class="crv-timezone-hint" style="display: none;"></span>
             </div>
           ` : ''}
 
@@ -308,6 +309,8 @@
         box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         max-width: 500px;
         margin: 0 auto;
+        display: block;
+        box-sizing: border-box;
       }
 
       .crv-booking-header {
@@ -378,6 +381,13 @@
       .crv-input:disabled {
         background: #f5f5f5;
         cursor: not-allowed;
+      }
+
+      .crv-timezone-hint {
+        font-size: 12px;
+        color: #666;
+        margin-top: 4px;
+        display: block;
       }
 
       .crv-textarea {
@@ -534,6 +544,7 @@
   async function fetchAvailability(date) {
     const timeSelect = document.getElementById('crv-time');
     const serviceSelect = document.getElementById('crv-service');
+    const timezoneHint = document.getElementById('crv-timezone-hint');
 
     if (!timeSelect) return;
 
@@ -554,6 +565,12 @@
       });
 
       const data = await response.json();
+
+      // Update timezone display if returned
+      if (data.timezone && timezoneHint) {
+        timezoneHint.textContent = `Times shown in ${formatTimezone(data.timezone)}`;
+        timezoneHint.style.display = 'block';
+      }
 
       if (data.available && data.slots.length > 0) {
         state.availableSlots = data.slots;
@@ -737,6 +754,21 @@
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  function formatTimezone(tz) {
+    // Convert IANA timezone to friendly name
+    const tzNames = {
+      'America/New_York': 'Eastern Time',
+      'America/Chicago': 'Central Time',
+      'America/Denver': 'Mountain Time',
+      'America/Los_Angeles': 'Pacific Time',
+      'America/Phoenix': 'Arizona Time',
+      'America/Anchorage': 'Alaska Time',
+      'Pacific/Honolulu': 'Hawaii Time',
+      'UTC': 'UTC'
+    };
+    return tzNames[tz] || tz.replace(/_/g, ' ').replace('America/', '');
   }
 
   // Initialize when DOM is ready
