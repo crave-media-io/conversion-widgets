@@ -322,7 +322,7 @@
         font-size: 24px;
         font-weight: 700;
         margin: 0 0 8px 0;
-        color: ${textColor};
+        color: ${primaryColor};
       }
 
       .crv-booking-subheadline {
@@ -620,6 +620,7 @@
         customer_address: formData.get('address') || null,
         service_id: formData.get('service') || null,
         service_name: selectedService?.text || null,
+        duration_minutes: selectedService?.dataset?.duration ? parseInt(selectedService.dataset.duration, 10) : null,
         requested_date: formData.get('date'),
         requested_time: formData.get('time') || null,
         notes: formData.get('notes') || null,
@@ -648,7 +649,8 @@
         // Show success message
         showSuccess(result);
       } else {
-        throw new Error(result.error || 'Booking failed');
+        const errorMsg = result.details ? `${result.error}: ${result.details}` : (result.error || 'Booking failed');
+        throw new Error(errorMsg);
       }
 
     } catch (error) {
