@@ -270,7 +270,7 @@
             <div class="crv-form-group crv-checkbox-group">
               <label class="crv-checkbox-label">
                 <input type="checkbox" id="crv-checkbox" name="custom_checkbox" ${config.checkbox_required ? 'required' : ''}>
-                <span>${escapeHtml(config.checkbox_label || 'I agree to the terms and conditions')}</span>
+                <span>${escapeHtml(config.checkbox_label || 'I agree to receive text and email appointment reminders and follow-up messages. Message and data rates may apply.')}</span>
               </label>
             </div>
           ` : ''}
