@@ -297,6 +297,7 @@
     const primaryColor = config.primary_color || '#667eea';
     const bgColor = config.background_color || '#ffffff';
     const textColor = config.text_color || '#333333';
+    const headlineColor = config.headline_color || '#000000';
     const fontFamily = config.font_family || 'inherit';
 
     return `
@@ -322,7 +323,7 @@
         font-size: 24px;
         font-weight: 700;
         margin: 0 0 8px 0;
-        color: ${primaryColor};
+        color: ${headlineColor};
       }
 
       .crv-booking-subheadline {
@@ -366,7 +367,7 @@
         border: 2px solid #e0e0e0;
         border-radius: 8px;
         background: #fff;
-        color: ${textColor};
+        color: #333333;
         transition: border-color 0.2s, box-shadow 0.2s;
         font-family: inherit;
         box-sizing: border-box;
