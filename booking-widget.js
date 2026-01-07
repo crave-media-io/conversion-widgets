@@ -266,14 +266,7 @@
             <textarea id="crv-notes" name="notes" class="crv-input crv-textarea" rows="3" placeholder="Any details about your request..."></textarea>
           </div>
 
-          ${config.show_checkbox ? `
-            <div class="crv-form-group crv-checkbox-group">
-              <label class="crv-checkbox-label">
-                <input type="checkbox" id="crv-checkbox" name="custom_checkbox" ${config.checkbox_required ? 'required' : ''}>
-                <span>${escapeHtml(config.checkbox_label || 'I agree to receive text and email appointment reminders and follow-up messages. Message and data rates may apply.')}</span>
-              </label>
-            </div>
-          ` : ''}
+          ${buildConsentCheckbox(config, escapeHtml)}
 
           <button type="submit" class="crv-submit-btn">
             <span class="crv-btn-text">${escapeHtml(config.button_text)}</span>
@@ -757,6 +750,49 @@
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  /**
+   * Build consent checkbox HTML with TCPA compliance
+   * SMS features require mandatory consent checkbox with specific language
+   */
+  function buildConsentCheckbox(config, escapeHtmlFn) {
+    // Check if SMS features are enabled (requires mandatory consent per TCPA)
+    const smsEnabled = config.reminder_sms_enabled ||
+      config.review_request_channel === 'sms' ||
+      config.review_request_channel === 'both';
+
+    // Force checkbox if SMS is enabled
+    const showCheckbox = config.show_checkbox || smsEnabled;
+
+    if (!showCheckbox) {
+      return '';
+    }
+
+    const isRequired = config.checkbox_required || smsEnabled;
+
+    // Mandatory consent text for SMS (TCPA compliance)
+    const mandatoryConsent = 'I agree to receive text and email appointment reminders and follow-up messages. Message and data rates may apply.';
+
+    // Build label: use mandatory text if SMS enabled, otherwise allow custom
+    let checkboxLabel;
+    if (smsEnabled) {
+      // When SMS is enabled, always use mandatory consent text
+      // Custom labels are ignored when SMS is on - compliance is non-negotiable
+      checkboxLabel = mandatoryConsent;
+    } else {
+      // No SMS - use custom label or default
+      checkboxLabel = config.checkbox_label || mandatoryConsent;
+    }
+
+    return `
+      <div class="crv-form-group crv-checkbox-group">
+        <label class="crv-checkbox-label">
+          <input type="checkbox" id="crv-checkbox" name="custom_checkbox" ${isRequired ? 'required' : ''}>
+          <span>${escapeHtmlFn(checkboxLabel)}</span>
+        </label>
+      </div>
+    `;
   }
 
   function formatTimezone(tz) {
