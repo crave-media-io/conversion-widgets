@@ -261,6 +261,32 @@
             }
           }
 
+          // First check if page_url itself is a wildcard that matches
+          var pageUrlMatch = false;
+          if (page.page_url && page.page_url.indexOf('*') !== -1) {
+            var parts = page.page_url.split('*');
+            var match = true;
+            var searchFrom = 0;
+            for (var k = 0; k < parts.length; k++) {
+              if (parts[k] === '') continue;
+              var idx = currentPath.indexOf(parts[k], searchFrom);
+              if (idx === -1) {
+                match = false;
+                break;
+              }
+              searchFrom = idx + parts[k].length;
+            }
+            if (match) {
+              console.log('✅ page_url wildcard match:', page.page_url, 'matches', currentPath);
+              pageUrlMatch = true;
+            }
+          }
+
+          if (pageUrlMatch) {
+            data = [page];
+            break;
+          }
+
           if (additionalUrls && additionalUrls.length > 0) {
             var foundMatch = false;
             for (var j = 0; j < additionalUrls.length; j++) {
