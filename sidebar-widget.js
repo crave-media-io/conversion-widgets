@@ -6,8 +6,6 @@
     key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuc2JpcnBha252aWZrZ2JvZHFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5MDI1MjUsImV4cCI6MjA3NTQ3ODUyNX0.0f_q15ZhmHI2gEpS53DyIeRnReF-KS4YYJ1PdetyYwQ'
   };
 
-  const VERCEL_API = 'https://conversion-widget-bvlot9viq-zacs-projects-da5d5e52.vercel.app';
-
   const scriptTag = document.currentScript || document.querySelector('script[data-client-id][src*="sidebar-widget"]');
   const CLIENT_ID = scriptTag ? scriptTag.getAttribute('data-client-id') : 'test_client_123';
 
@@ -477,12 +475,15 @@
   function trackDismissal(variant) {
     const perfData = getPerformanceData();
     const key = variant.headline;
-    
+
     if (perfData[key]) {
       perfData[key].dismissals++;
       savePerformanceData(perfData);
       console.log('❌ Sidebar dismissed:', key);
     }
+
+    // Send dismissal event to Supabase for analytics
+    sendToSupabase('dismissal', variant);
   }
 
   function selectBestVariant(variants) {
@@ -648,7 +649,7 @@
     } else {
       // Fall back to default behavior
       buttonLink = config.button_type === 'call'
-        ? `tel:${config.phone_number.replace(/\D/g, '')}`
+        ? `tel:${(config.phone_number || '').replace(/\D/g, '')}`
         : config.booking_url;
     }
 
@@ -886,20 +887,22 @@
     
     const ctaBtn = document.getElementById('sidebar-cta-btn');
     const dismissBtn = document.getElementById('sidebar-dismiss');
-    
-    ctaBtn.addEventListener('click', () => {
-      trackConversion(state.currentVariant);
 
-      if (window.gtag) {
-        gtag('event', 'conversion', {
-          'event_category': 'Sidebar Widget',
-          'event_label': state.config.button_type,
-          'variant': state.currentVariant.headline,
-          'variant_style': state.currentVariant.style
-        });
-      }
-    });
-    
+    if (ctaBtn) {
+      ctaBtn.addEventListener('click', () => {
+        trackConversion(state.currentVariant);
+
+        if (window.gtag) {
+          gtag('event', 'conversion', {
+            'event_category': 'Sidebar Widget',
+            'event_label': state.config.button_type,
+            'variant': state.currentVariant.headline,
+            'variant_style': state.currentVariant.style
+          });
+        }
+      });
+    }
+
     if (dismissBtn) {
       dismissBtn.addEventListener('click', () => {
         trackDismissal(state.currentVariant);
@@ -1044,14 +1047,6 @@
       }
     };
   }
-
-  window.clearSidebarData = function() {
-    localStorage.removeItem('sidebarPerformance_' + CLIENT_ID);
-    localStorage.removeItem('sidebarDismissed_' + CLIENT_ID);
-    sessionStorage.removeItem(`headlines_${CLIENT_ID}_${window.location.pathname}`);
-    console.log('✨ Sidebar data cleared!');
-    location.reload();
-  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
