@@ -1154,22 +1154,6 @@
   }
 
   // ============================================
-  // VARIANT CREATION & ROTATION
-  // ============================================
-  function createVariantsFromOffers(offers) {
-    return offers.map(offer => ({
-      offer_number: offer.offer_number,
-      headline: offer.headline,
-      discount_type: offer.discount_type,
-      discount_value: offer.discount_value,
-      button_text: offer.button_text,
-      disclaimer: offer.disclaimer,
-      expiration_mode: offer.expiration_mode,
-      expiration_display: offer.expiration_display
-    }));
-  }
-
-  // ============================================
   // HEADLINE ROTATION
   // ============================================
   function startHeadlineRotation() {
@@ -1388,9 +1372,25 @@
 
       // Expose utility functions
       window.clearSmartCouponData = function() {
+        // Clear specific keys
         sessionStorage.removeItem(`smart_coupon_bg_${CLIENT_ID}`);
         sessionStorage.removeItem(`smart_coupon_style_${CLIENT_ID}`);
         sessionStorage.removeItem(`smart_coupon_button_${CLIENT_ID}`);
+        sessionStorage.removeItem(`smart_coupon_offer_${CLIENT_ID}`);
+
+        // Clear all headline cache and impression tracking keys for this client
+        const keysToRemove = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          if (key && (
+            key.startsWith(`smart_coupon_headlines_${CLIENT_ID}_`) ||
+            key.startsWith(`coupon_impression_${CLIENT_ID}_`)
+          )) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(key => sessionStorage.removeItem(key));
+
         console.log('✨ Smart Coupon data cleared!');
         location.reload();
       };
