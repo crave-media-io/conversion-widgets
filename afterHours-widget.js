@@ -22,6 +22,14 @@
     forceMobile: storedForceMobile  // For testing
   };
 
+  // Escape HTML to prevent XSS attacks
+  function escapeHtml(text) {
+    if (typeof text !== 'string') return text;
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   function getContrastColor(hexColor) {
     // Convert hex to RGB
     const r = parseInt(hexColor.substr(1, 2), 16);
@@ -221,7 +229,8 @@
       }
 
       const data = await response.json();
-      const enabledWidgets = data[0]?.enabled_widgets || [];
+      const rawWidgets = data[0]?.enabled_widgets;
+      const enabledWidgets = Array.isArray(rawWidgets) ? rawWidgets : [];
 
       if (!enabledWidgets.includes(widgetName)) {
         console.log(`🚫 Widget "${widgetName}" not enabled for client ${clientId}`);
@@ -249,6 +258,11 @@
           }
         }
       );
+
+      if (!response.ok) {
+        console.error('❌ Failed to fetch config:', response.status, response.statusText);
+        return null;
+      }
 
       const data = await response.json();
 
@@ -352,11 +366,12 @@
     const fontFamily = config.custom_font_family || 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
     const buttonColor = config.after_hours_button_color || '#667eea';
     const buttonTextColor = config.after_hours_button_text_color || '#FFFFFF';
-    const popupMessage = config.after_hours_message || "We're currently closed. Book online instead!";
+    // Escape user-supplied content to prevent XSS
+    const popupMessage = escapeHtml(config.after_hours_message || "We're currently closed. Book online instead!");
     const allowCall = config.after_hours_allow_call !== false; // default true
-    const popupIcon = config.after_hours_popup_icon || '🌙'; // Use custom icon or default to moon
-    const popupButtonText = config.after_hours_popup_button_text || 'Book Online Now';
-    const popupButtonIcon = config.after_hours_popup_button_icon || '📅';
+    const popupIcon = escapeHtml(config.after_hours_popup_icon || '🌙'); // Use custom icon or default to moon
+    const popupButtonText = escapeHtml(config.after_hours_popup_button_text || 'Book Online Now');
+    const popupButtonIcon = escapeHtml(config.after_hours_popup_button_icon || '📅');
 
     // Use show_branding from database config (set based on subscription plan)
     // Pro, Premium, and Unlimited plans have show_branding=false
@@ -1206,7 +1221,8 @@
         replacePhoneNumbers();
       }
 
-      // Also watch for dynamic content
+      // Also watch for dynamic content with debounce to prevent race conditions
+      let replaceTimeout = null;
       const observer = new MutationObserver((mutations) => {
         let shouldReplace = false;
         mutations.forEach(mutation => {
@@ -1221,7 +1237,14 @@
         });
 
         if (shouldReplace) {
-          setTimeout(replacePhoneNumbers, 100);
+          // Clear any pending replacement to debounce rapid mutations
+          if (replaceTimeout) {
+            clearTimeout(replaceTimeout);
+          }
+          replaceTimeout = setTimeout(() => {
+            replaceTimeout = null;
+            replacePhoneNumbers();
+          }, 100);
         }
       });
 
