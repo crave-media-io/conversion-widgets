@@ -320,27 +320,32 @@
 
     // Determine which schedule to use
     let startTime, endTime;
+    let isWeekendCustomHours = false; // Track if using weekend custom hours (times mean business OPEN)
 
     if (isSaturday && config.after_hours_saturday_start) {
-      // Custom Saturday hours
+      // Custom Saturday hours - times represent when business is OPEN
       if (!config.after_hours_saturday_enabled) {
         console.log('📅 Saturday - business closed all day');
         return true; // Closed all day Saturday
       }
       startTime = config.after_hours_saturday_start || '09:00';
       endTime = config.after_hours_saturday_end || '17:00';
-      console.log('📅 Using custom Saturday hours:', startTime, '-', endTime);
+      isWeekendCustomHours = true;
+      console.log('📅 Using custom Saturday hours (business open):', startTime, '-', endTime);
     } else if (isSunday && config.after_hours_sunday_start) {
-      // Custom Sunday hours
+      // Custom Sunday hours - times represent when business is OPEN
       if (!config.after_hours_sunday_enabled) {
         console.log('📅 Sunday - business closed all day');
         return true; // Closed all day Sunday
       }
       startTime = config.after_hours_sunday_start || '09:00';
       endTime = config.after_hours_sunday_end || '17:00';
-      console.log('📅 Using custom Sunday hours:', startTime, '-', endTime);
+      isWeekendCustomHours = true;
+      console.log('📅 Using custom Sunday hours (business open):', startTime, '-', endTime);
     } else {
       // Default weekday hours (or weekend if no custom schedule)
+      // For weekdays: startTime = when business CLOSES (widget starts)
+      //               endTime = when business OPENS (widget stops)
       startTime = config.after_hours_start || '17:00';
       endTime = config.after_hours_end || '09:00';
       const dayName = isWeekend ? (isSaturday ? 'Saturday' : 'Sunday') : 'weekday';
@@ -354,12 +359,26 @@
     const startMinutes = startHour * 60 + startMin;
     const endMinutes = endHour * 60 + endMin;
 
+    let isWithinTimeRange;
+
     // Handle overnight periods (e.g., 5 PM to 9 AM)
     if (startMinutes > endMinutes) {
-      return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+      isWithinTimeRange = currentMinutes >= startMinutes || currentMinutes < endMinutes;
     } else {
-      return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+      isWithinTimeRange = currentMinutes >= startMinutes && currentMinutes < endMinutes;
     }
+
+    // For weekend custom hours: times represent when business is OPEN
+    // So widget should be INACTIVE (return false) when within those hours
+    // Widget should be ACTIVE (return true) when OUTSIDE those hours
+    if (isWeekendCustomHours) {
+      const result = !isWithinTimeRange;
+      console.log('📅 Weekend custom hours: current time within open hours?', isWithinTimeRange, '→ Widget active?', result);
+      return result;
+    }
+
+    // For weekday hours: times represent after-hours period (widget active)
+    return isWithinTimeRange;
   }
 
   function createPopupHTML(config) {
