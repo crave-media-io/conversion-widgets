@@ -812,7 +812,7 @@
     // Limit colors and texts based on plan tier (Trial/Starter = 3, Pro+ = 5)
     const isComplimentary = state.config.is_complimentary || false;
     const plan = state.config.subscription_plan || 'starter';
-    const isPro = plan === 'professional' || plan === 'premium' || plan === 'expert' || plan === 'unlimited';
+    const isPro = plan === 'professional' || plan === 'pro' || plan === 'premium' || plan === 'expert' || plan === 'unlimited';
 
     if (!isComplimentary && !isPro) {
       if (buttonColors.length > 3) {
