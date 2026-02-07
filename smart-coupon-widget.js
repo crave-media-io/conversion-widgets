@@ -1355,7 +1355,7 @@
       // Limit colors based on plan tier (Trial/Starter = 3 colors, Pro+ = 5 colors)
       const isComplimentary = state.config.is_complimentary || false;
       const plan = state.config.subscription_plan || 'starter';
-      const isPro = plan === 'professional' || plan === 'premium' || plan === 'expert' || plan === 'unlimited';
+      const isPro = plan === 'professional' || plan === 'pro' || plan === 'premium' || plan === 'expert' || plan === 'unlimited';
 
       if (!isComplimentary && !isPro && backgroundColors.length > 3) {
         console.log('🎨 Trial/Starter plan detected - limiting to first 3 background colors');
