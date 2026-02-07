@@ -1,13 +1,17 @@
 /**
- * Widget Gateway Script v1.5
+ * Widget Gateway Script v1.6
  *
  * This is the ONLY script clients need to install.
  * It handles:
  * - Account status checking (active/suspended/canceled)
  * - Domain verification (prevents unauthorized use)
- * - Enabled widgets filtering
+ * - Live widgets filtering (checks live_widgets, not enabled_widgets)
  * - Dynamic widget loading
  * - Silent blocking (NO customer-facing messages ever)
+ *
+ * Changelog v1.6:
+ * - CHANGED: Now checks `live_widgets` column instead of `enabled_widgets`
+ * - This separates "enabled in dashboard" from "visible to site visitors"
  *
  * Changelog v1.5:
  * - ADDED: Domain verification against booking_url
@@ -300,37 +304,37 @@
 
         console.log('[Widget Gateway] ✓ Domain verified');
 
-        // Get enabled widgets
-        let enabledWidgets = client.enabled_widgets || [];
+        // Get live widgets (widgets that should be visible to site visitors)
+        let liveWidgets = client.live_widgets || [];
 
         // Handle string format (if stored as JSON string)
-        if (typeof enabledWidgets === 'string') {
+        if (typeof liveWidgets === 'string') {
             try {
-                enabledWidgets = JSON.parse(enabledWidgets);
+                liveWidgets = JSON.parse(liveWidgets);
             } catch (e) {
-                console.error('[Widget Gateway] Error parsing enabled_widgets:', e);
-                enabledWidgets = [];
+                console.error('[Widget Gateway] Error parsing live_widgets:', e);
+                liveWidgets = [];
             }
         }
 
         // Ensure it's an array
-        if (!Array.isArray(enabledWidgets)) {
-            console.error('[Widget Gateway] enabled_widgets is not an array:', enabledWidgets);
-            enabledWidgets = [];
+        if (!Array.isArray(liveWidgets)) {
+            console.error('[Widget Gateway] live_widgets is not an array:', liveWidgets);
+            liveWidgets = [];
         }
 
-        console.log('[Widget Gateway] Enabled widgets:', enabledWidgets);
+        console.log('[Widget Gateway] Live widgets:', liveWidgets);
 
-        // If no widgets are enabled, exit
-        if (enabledWidgets.length === 0) {
-            console.log('[Widget Gateway] No widgets enabled for this site.');
+        // If no widgets are live, exit
+        if (liveWidgets.length === 0) {
+            console.log('[Widget Gateway] No widgets live for this site.');
             return;
         }
 
-        // Load each enabled widget
-        console.log('[Widget Gateway] Loading enabled widgets...');
+        // Load each live widget
+        console.log('[Widget Gateway] Loading live widgets...');
 
-        const loadPromises = enabledWidgets.map(widgetId => {
+        const loadPromises = liveWidgets.map(widgetId => {
             return loadWidget(widgetId, clientId).catch(error => {
                 console.error(`[Widget Gateway] Failed to load ${widgetId}:`, error);
                 // Continue loading other widgets even if one fails
