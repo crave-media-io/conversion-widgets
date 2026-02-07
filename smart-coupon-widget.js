@@ -305,18 +305,33 @@
 
   // ============================================
   // SESSION-BASED VARIANT SELECTION
+  // Uses signature-based cache invalidation to detect config changes
   // ============================================
   function selectSessionBackgroundColor(colors) {
     const sessionKey = `smart_coupon_bg_${CLIENT_ID}`;
     const cached = sessionStorage.getItem(sessionKey);
+    const signature = colors.slice().sort().join(',');
 
-    if (cached && colors.includes(cached)) {
-      console.log('📦 Using cached background color:', cached);
-      return cached;
+    if (cached) {
+      try {
+        const cachedData = JSON.parse(cached);
+        if (cachedData.signature === signature && colors.includes(cachedData.value)) {
+          console.log('📦 Using cached background color:', cachedData.value);
+          return cachedData.value;
+        }
+        console.log('🔄 Background colors changed, selecting new color');
+      } catch (e) {
+        // Legacy format - check if still valid
+        if (colors.includes(cached)) {
+          sessionStorage.setItem(sessionKey, JSON.stringify({ value: cached, signature }));
+          console.log('📦 Migrated cached background color:', cached);
+          return cached;
+        }
+      }
     }
 
     const selected = colors[Math.floor(Math.random() * colors.length)];
-    sessionStorage.setItem(sessionKey, selected);
+    sessionStorage.setItem(sessionKey, JSON.stringify({ value: selected, signature }));
     console.log('🎨 Selected background color for session:', selected);
     return selected;
   }
@@ -324,14 +339,28 @@
   function selectSessionDesignStyle(styles) {
     const sessionKey = `smart_coupon_style_${CLIENT_ID}`;
     const cached = sessionStorage.getItem(sessionKey);
+    const signature = styles.slice().sort().join(',');
 
-    if (cached && styles.includes(cached)) {
-      console.log('📦 Using cached design style:', cached);
-      return cached;
+    if (cached) {
+      try {
+        const cachedData = JSON.parse(cached);
+        if (cachedData.signature === signature && styles.includes(cachedData.value)) {
+          console.log('📦 Using cached design style:', cachedData.value);
+          return cachedData.value;
+        }
+        console.log('🔄 Design styles changed, selecting new style');
+      } catch (e) {
+        // Legacy format - check if still valid
+        if (styles.includes(cached)) {
+          sessionStorage.setItem(sessionKey, JSON.stringify({ value: cached, signature }));
+          console.log('📦 Migrated cached design style:', cached);
+          return cached;
+        }
+      }
     }
 
     const selected = styles[Math.floor(Math.random() * styles.length)];
-    sessionStorage.setItem(sessionKey, selected);
+    sessionStorage.setItem(sessionKey, JSON.stringify({ value: selected, signature }));
     console.log('🎭 Selected design style for session:', selected);
     return selected;
   }
@@ -339,14 +368,28 @@
   function selectSessionButtonText(buttonTexts) {
     const sessionKey = `smart_coupon_button_${CLIENT_ID}`;
     const cached = sessionStorage.getItem(sessionKey);
+    const signature = buttonTexts.slice().sort().join(',');
 
-    if (cached && buttonTexts.includes(cached)) {
-      console.log('📦 Using cached button text:', cached);
-      return cached;
+    if (cached) {
+      try {
+        const cachedData = JSON.parse(cached);
+        if (cachedData.signature === signature && buttonTexts.includes(cachedData.value)) {
+          console.log('📦 Using cached button text:', cachedData.value);
+          return cachedData.value;
+        }
+        console.log('🔄 Button texts changed, selecting new text');
+      } catch (e) {
+        // Legacy format - check if still valid
+        if (buttonTexts.includes(cached)) {
+          sessionStorage.setItem(sessionKey, JSON.stringify({ value: cached, signature }));
+          console.log('📦 Migrated cached button text:', cached);
+          return cached;
+        }
+      }
     }
 
     const selected = buttonTexts[Math.floor(Math.random() * buttonTexts.length)];
-    sessionStorage.setItem(sessionKey, selected);
+    sessionStorage.setItem(sessionKey, JSON.stringify({ value: selected, signature }));
     console.log('📝 Selected button text for session:', selected);
     return selected;
   }
@@ -687,16 +730,43 @@
     }
 
     // Select one style for this offer using session-based persistence
+    // Store both selected style AND available styles to detect config changes
     const sessionKey = `smart_coupon_style_offer_${variant.offer_number}_${CLIENT_ID}`;
     const cached = sessionStorage.getItem(sessionKey);
 
+    // Create a signature of available styles to detect changes
+    const stylesSignature = offerStyles.slice().sort().join(',');
+
     let style;
-    if (cached && offerStyles.includes(cached)) {
-      style = cached;
-      console.log('📦 Using cached style for offer #' + variant.offer_number + ':', style);
+    if (cached) {
+      try {
+        const cachedData = JSON.parse(cached);
+        // Check if both the cached style is still valid AND the available styles haven't changed
+        if (cachedData.stylesSignature === stylesSignature && offerStyles.includes(cachedData.style)) {
+          style = cachedData.style;
+          console.log('📦 Using cached style for offer #' + variant.offer_number + ':', style);
+        } else {
+          // Config changed - clear cache and select new style
+          console.log('🔄 Style config changed for offer #' + variant.offer_number + ', selecting new style');
+          style = offerStyles[Math.floor(Math.random() * offerStyles.length)];
+          sessionStorage.setItem(sessionKey, JSON.stringify({ style, stylesSignature }));
+          console.log('🎭 Selected style for offer #' + variant.offer_number + ':', style);
+        }
+      } catch (e) {
+        // Legacy cache format (just the style string) - migrate to new format
+        if (offerStyles.includes(cached)) {
+          style = cached;
+          sessionStorage.setItem(sessionKey, JSON.stringify({ style, stylesSignature }));
+          console.log('📦 Migrated cached style for offer #' + variant.offer_number + ':', style);
+        } else {
+          style = offerStyles[Math.floor(Math.random() * offerStyles.length)];
+          sessionStorage.setItem(sessionKey, JSON.stringify({ style, stylesSignature }));
+          console.log('🎭 Selected style for offer #' + variant.offer_number + ':', style);
+        }
+      }
     } else {
       style = offerStyles[Math.floor(Math.random() * offerStyles.length)];
-      sessionStorage.setItem(sessionKey, style);
+      sessionStorage.setItem(sessionKey, JSON.stringify({ style, stylesSignature }));
       console.log('🎭 Selected style for offer #' + variant.offer_number + ':', style);
     }
 
