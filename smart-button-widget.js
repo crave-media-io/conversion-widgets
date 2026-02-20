@@ -131,7 +131,7 @@
       console.log('🎯 Fetching Smart Button config for client:', CLIENT_ID);
 
       const response = await fetch(
-        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}`,
+        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}&select=client_id,status,subscription_status,subscription_plan,is_complimentary,trial_ends_at,booking_url,live_widgets,enabled_widgets,business_name,domain,phone_number,brand_color,position,headlines,smart_button_texts,smart_button_colors,smart_button_text_color,smart_button_headline_text_color,smart_button_headlines_enabled,smart_button_transparent_bg,smart_button_use_custom_url,smart_button_custom_url`,
         {
           headers: {
             'apikey': SUPABASE.key,
@@ -470,6 +470,13 @@
   // ============================================
   // CREATE SMART BUTTON HTML
   // ============================================
+  function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
   function createSmartButtonHTML(variant, config, instanceIndex = 0) {
     // Determine button link with custom URL override
     let buttonLink;
@@ -512,7 +519,7 @@
         color: ${headlineTextColor};
         font-family: inherit;
       ">
-        ${variant.headline}
+        ${escapeHtml(variant.headline)}
       </h2>
     ` : '';
 
@@ -571,7 +578,7 @@
           box-shadow: 0 4px 12px ${buttonColor}40;
         " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px ${buttonColor}60'"
            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px ${buttonColor}40'">
-          ${buttonText}
+          ${escapeHtml(buttonText)}
         </a>
 
         ${showBranding ? `
