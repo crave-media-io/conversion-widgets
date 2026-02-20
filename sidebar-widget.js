@@ -128,7 +128,7 @@
       console.log('🔍 Fetching config for client:', CLIENT_ID);
 
       const response = await fetch(
-        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}`,
+        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}&select=client_id,status,subscription_status,subscription_plan,is_complimentary,trial_ends_at,booking_url,live_widgets,enabled_widgets,business_name,domain,phone_number,brand_color,custom_font_family,button_type,position,show_branding,headlines,banner_bg_color,banner_border_color,sidebar_subline,sidebar_button_text,sidebar_use_custom_url,sidebar_custom_url,sidebar_icon,sidebar_text_color,sidebar_button_color,sidebar_button_text_color`,
         {
           headers: {
             'apikey': SUPABASE.key,
@@ -631,6 +631,13 @@
     }));
   }
 
+  function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
   function createSidebarHTML(variant, config) {
     const buttonText = config.sidebar_button_text ||
       (config.button_type === 'call' ? `📞 Call Now` : '📅 Book Online');
@@ -759,9 +766,9 @@
               margin-bottom: 20px;
               opacity: 0.9;
             ">
-              ${sidebarIcon}
+              ${escapeHtml(sidebarIcon)}
             </div>
-            
+
             <h2 id="sidebar-headline" style="
               margin: 0 0 20px 0;
               font-size: 32px;
@@ -770,7 +777,7 @@
               font-family: inherit;
               color: ${textColor};
             ">
-              ${variant.headline}
+              ${escapeHtml(variant.headline)}
             </h2>
             
             <p id="sidebar-message" style="
@@ -781,7 +788,7 @@
               font-family: inherit;
               color: ${textColor};
             ">
-              ${variant.message}
+              ${escapeHtml(variant.message)}
             </p>
           </div>
           
@@ -804,7 +811,7 @@
               font-family: inherit;
             " onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,0.4)'"
                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.3)'">
-              ${buttonText}
+              ${escapeHtml(buttonText)}
             </a>
             
             ${config.button_type === 'call' ? `
@@ -817,7 +824,7 @@
                 font-family: inherit;
                 color: ${textColor};
               ">
-                ${config.phone_number}
+                ${escapeHtml(config.phone_number)}
               </p>
             ` : ''}
             
@@ -833,7 +840,7 @@
                 font-family: inherit;
                 color: ${textColor};
               ">
-                ${config.business_name}
+                ${escapeHtml(config.business_name)}
               </p>
               ${config.show_branding !== false ? `
               <p style="
