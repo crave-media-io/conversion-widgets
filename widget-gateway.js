@@ -162,7 +162,7 @@
      */
     async function fetchClientConfig() {
         try {
-            const response = await fetch(`${SUPABASE_URL}/rest/v1/widget_clients?client_id=eq.${clientId}`, {
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/widget_clients?client_id=eq.${clientId}&select=client_id,status,subscription_status,subscription_plan,is_complimentary,trial_ends_at,booking_url,live_widgets`, {
                 method: 'GET',
                 headers: {
                     'apikey': SUPABASE_KEY,
