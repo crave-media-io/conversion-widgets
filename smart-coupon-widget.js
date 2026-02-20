@@ -130,7 +130,7 @@
       console.log('🎟️ Fetching Smart Coupons config for client:', CLIENT_ID);
 
       const response = await fetch(
-        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}`,
+        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}&select=client_id,status,subscription_status,subscription_plan,is_complimentary,trial_ends_at,booking_url,live_widgets,enabled_widgets,business_name,domain,phone_number,brand_color,position,headlines,smart_coupon_headlines_enabled,smart_coupon_background_colors,smart_coupon_button_color,smart_coupon_button_text_color,smart_coupon_headline_text_color,smart_coupon_disclaimer_text_color,smart_coupon_offer_text_color,smart_coupon_button_texts,smart_coupon_design_styles,smart_coupon_allow_style_rotation,smart_coupon_allow_button_rotation,smart_coupon_badge_ribbon_text,smart_coupon_badge_ribbon_custom,smart_coupon_vip_badge_text,smart_coupon_vip_badge_custom,smart_coupon_use_custom_url,smart_coupon_custom_url`,
         {
           headers: {
             'apikey': SUPABASE.key,
@@ -698,6 +698,13 @@
     return state.headlines[state.currentHeadlineIndex];
   }
 
+  function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
   function createCouponHTML(variant, config, instanceIndex = 0) {
     // Determine button link
     let buttonLink;
@@ -849,7 +856,7 @@
           font-family: inherit;
           animation: 0.6s ease-in-out 0s 1 normal none running fadeHeadline;
         ">
-          ${rotatingHeadline}
+          ${escapeHtml(rotatingHeadline)}
         </div>
       </div>
     ` : '';
@@ -885,7 +892,7 @@
             line-height: 1.2;
             color: ${headlineTextColor};
           ">
-            ${variant.headline}
+            ${escapeHtml(variant.headline)}
           </div>
           ${variant.expiration_display === 'below_headline' ? expirationHTML : ''}
           <div class="coupon-discount" style="
@@ -895,7 +902,7 @@
             margin: 20px 0;
             line-height: 1;
           ">
-            ${discountDisplay}
+            ${escapeHtml(discountDisplay)}
           </div>
           <a href="${buttonLink}" class="coupon-button" onclick="window.smartCouponClick && window.smartCouponClick()" style="
             display: inline-block;
@@ -909,7 +916,7 @@
             margin: 5px 0;
             transition: all 0.3s;
             cursor: pointer;
-          ">${buttonText}</a>
+          ">${escapeHtml(buttonText)}</a>
           ${variant.disclaimer ? `
             <p class="coupon-disclaimer" style="
               font-size: 12px;
@@ -918,7 +925,7 @@
               opacity: 0.95;
               color: ${disclaimerTextColor};
             ">
-              ${variant.disclaimer}
+              ${escapeHtml(variant.disclaimer)}
             </p>
           ` : ''}
           ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
@@ -960,7 +967,7 @@
             letter-spacing: 1px;
             color: ${headlineTextColor};
           ">
-            ${variant.headline}
+            ${escapeHtml(variant.headline)}
           </div>
           ${variant.expiration_display === 'below_headline' ? expirationHTML : ''}
           <div class="coupon-discount" style="
@@ -971,7 +978,7 @@
             line-height: 1;
             letter-spacing: -2px;
           ">
-            ${discountDisplay}
+            ${escapeHtml(discountDisplay)}
           </div>
           <a href="${buttonLink}" class="coupon-button" onclick="window.smartCouponClick && window.smartCouponClick()" style="
             display: inline-block;
@@ -988,7 +995,7 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          ">${buttonText}</a>
+          ">${escapeHtml(buttonText)}</a>
           ${variant.disclaimer ? `
             <p class="coupon-disclaimer" style="
               font-size: 12px;
@@ -997,7 +1004,7 @@
               opacity: 0.95;
               color: ${disclaimerTextColor};
             ">
-              ${variant.disclaimer}
+              ${escapeHtml(variant.disclaimer)}
             </p>
           ` : ''}
           ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
@@ -1047,7 +1054,7 @@
               border: 2px solid #ffeb3b;
               white-space: nowrap;
               font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            ">${ribbonText}</div>` : ''}
+            ">${escapeHtml(ribbonText)}</div>` : ''}
             ${vipBadgeText ? `<div class="vip-badge" style="
               position: absolute;
               top: -10px;
@@ -1062,7 +1069,7 @@
               letter-spacing: 2px;
               box-shadow: 0 2px 8px rgba(0,0,0,0.2);
               font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            ">${vipBadgeText}</div>` : ''}
+            ">${escapeHtml(vipBadgeText)}</div>` : ''}
             <div class="coupon-headline" style="
               font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
               font-size: ${badgeHeadlineFontSize}px;
@@ -1074,7 +1081,7 @@
               color: ${headlineTextColor};
               text-align: center;
             ">
-              ${variant.headline}
+              ${escapeHtml(variant.headline)}
             </div>
             ${variant.expiration_display === 'below_headline' ? expirationHTML : ''}
             <div class="coupon-discount" style="
@@ -1086,7 +1093,7 @@
               text-shadow: 0 2px 8px rgba(0,0,0,0.3);
               text-align: center;
             ">
-              ${discountDisplay}
+              ${escapeHtml(discountDisplay)}
             </div>
             <a href="${buttonLink}" class="coupon-button" onclick="window.smartCouponClick && window.smartCouponClick()" style="
               display: inline-block;
@@ -1103,7 +1110,7 @@
               text-transform: uppercase;
               letter-spacing: 1px;
               box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            ">${buttonText}</a>
+            ">${escapeHtml(buttonText)}</a>
             ${variant.expiration_display === 'below_disclaimer' ? expirationHTML : ''}
             ${variant.disclaimer ? `
               <div style="position: relative; display: inline-block; margin-top: ${expirationText ? '-10px' : '-10px'};">
@@ -1138,7 +1145,7 @@
                   z-index: 1000;
                   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                   pointer-events: none;
-                ">${variant.disclaimer}</div>
+                ">${escapeHtml(variant.disclaimer)}</div>
               </div>
               <style>
                 .elegant-badge-disclaimer-trigger:hover {
