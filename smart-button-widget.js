@@ -131,7 +131,7 @@
       console.log('🎯 Fetching Smart Button config for client:', CLIENT_ID);
 
       const response = await fetch(
-        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}&select=client_id,status,subscription_status,subscription_plan,is_complimentary,trial_ends_at,booking_url,live_widgets,enabled_widgets,business_name,domain,phone_number,brand_color,position,headlines,smart_button_texts,smart_button_colors,smart_button_text_color,smart_button_headline_text_color,smart_button_headlines_enabled,smart_button_transparent_bg,smart_button_use_custom_url,smart_button_custom_url`,
+        `${SUPABASE.url}/rest/v1/widget_clients?client_id=eq.${CLIENT_ID}&select=client_id,status,subscription_status,subscription_plan,is_complimentary,trial_ends_at,booking_url,live_widgets,enabled_widgets,business_name,domain,phone_number,brand_color,position,headlines,smart_button_texts,smart_button_colors,smart_button_text_color,smart_button_headline_text_color,smart_button_headlines_enabled,smart_button_transparent_bg,smart_button_use_custom_url,smart_button_custom_url,button_type,show_branding,banner_bg_color,banner_border_color,custom_font_family`,
         {
           headers: {
             'apikey': SUPABASE.key,
