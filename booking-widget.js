@@ -665,11 +665,12 @@
     const container = document.getElementById(CONTAINER_ID);
     const config = state.config;
 
+    const primaryColor = config.primary_color || '#667eea';
     container.innerHTML = `
       <style>
         .crv-success {
           text-align: center;
-          padding: 40px 24px;
+          padding: 48px 32px 40px;
           background: ${config.background_color || '#ffffff'};
           border-radius: 12px;
           box-shadow: 0 4px 20px rgba(0,0,0,0.1);
@@ -678,39 +679,122 @@
           font-family: ${config.font_family || 'inherit'}, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
-        .crv-success-icon {
-          font-size: 64px;
-          margin-bottom: 16px;
+        .crv-check-wrap {
+          position: relative;
+          width: 88px;
+          height: 88px;
+          margin: 0 auto 28px;
+        }
+
+        .crv-circle-bg {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          background: ${primaryColor}18;
+          animation: crvScaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+          transform: scale(0);
+        }
+
+        .crv-check-svg {
+          position: relative;
+          width: 88px;
+          height: 88px;
+          z-index: 1;
+        }
+
+        .crv-circle-stroke {
+          fill: none;
+          stroke: ${primaryColor};
+          stroke-width: 2.5;
+          stroke-linecap: round;
+          stroke-dasharray: 251;
+          stroke-dashoffset: 251;
+          animation: crvDrawCircle 0.7s 0.3s ease-out forwards;
+        }
+
+        .crv-check-stroke {
+          fill: none;
+          stroke: ${primaryColor};
+          stroke-width: 3;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          stroke-dasharray: 36;
+          stroke-dashoffset: 36;
+          animation: crvDrawCheck 0.35s 0.85s ease-out forwards;
         }
 
         .crv-success h2 {
+          font-size: 22px;
+          font-weight: 600;
           color: ${config.text_color || '#333'};
-          font-size: 24px;
-          margin: 0 0 12px 0;
+          margin: 0 0 10px 0;
+          opacity: 0;
+          animation: crvFadeUp 0.5s 1s ease forwards;
         }
 
         .crv-success p {
+          font-size: 14.5px;
           color: ${config.text_color || '#333'};
-          opacity: 0.8;
-          font-size: 16px;
-          margin: 0 0 20px 0;
+          opacity: 0;
+          line-height: 1.6;
+          max-width: 360px;
+          margin: 0 auto 24px;
+          animation: crvFadeUp 0.5s 1.1s ease forwards;
+        }
+
+        .crv-ref-label {
+          font-size: 11px;
+          font-weight: 500;
+          color: #999;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          margin-bottom: 6px;
+          opacity: 0;
+          animation: crvFadeUp 0.5s 1.15s ease forwards;
         }
 
         .crv-booking-ref {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: ${primaryColor}0d;
+          border: 1px solid ${primaryColor}25;
+          padding: 10px 20px;
+          border-radius: 10px;
           font-family: monospace;
-          background: #f0f0f0;
-          padding: 12px 20px;
-          border-radius: 6px;
-          display: inline-block;
-          font-size: 18px;
+          font-size: 14px;
           font-weight: 600;
-          color: ${config.primary_color || '#667eea'};
+          color: ${primaryColor};
+          letter-spacing: 0.5px;
+          opacity: 0;
+          animation: crvFadeUp 0.5s 1.2s ease forwards;
+        }
+
+        @keyframes crvScaleIn {
+          to { transform: scale(1); }
+        }
+        @keyframes crvDrawCircle {
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes crvDrawCheck {
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes crvFadeUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       </style>
       <div class="crv-success">
-        <div class="crv-success-icon">&#x2705;</div>
-        <h2>Booking Submitted!</h2>
+        <div class="crv-check-wrap">
+          <div class="crv-circle-bg"></div>
+          <svg class="crv-check-svg" viewBox="0 0 88 88">
+            <circle class="crv-circle-stroke" cx="44" cy="44" r="40"/>
+            <polyline class="crv-check-stroke" points="28 45 39 56 60 34"/>
+          </svg>
+        </div>
+        <h2>Booking Confirmed!</h2>
         <p>${escapeHtml(result.message || config.success_message)}</p>
+        <div class="crv-ref-label">Booking Reference</div>
         <div class="crv-booking-ref">${escapeHtml(result.booking_reference)}</div>
       </div>
     `;
